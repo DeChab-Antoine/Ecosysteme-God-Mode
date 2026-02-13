@@ -15,7 +15,7 @@ export function createRenderer(canvas, { gridW, gridH, cellSize }) {
   // =========================
   function clear() {
     // On remplit tout en blanc (fond)
-    ctx.fillStyle = "white";
+    ctx.fillStyle = "grey";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
 
@@ -24,7 +24,7 @@ export function createRenderer(canvas, { gridW, gridH, cellSize }) {
   // =========================
   function drawGrid() {
     // Ligne fine et transparente
-    ctx.strokeStyle = "rgba(0,0,0,0.1)";
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.33)";
     ctx.lineWidth = 1;
 
     // Lignes verticales
@@ -71,7 +71,7 @@ export function createRenderer(canvas, { gridW, gridH, cellSize }) {
   // =========================
   function drawWorldBorder() {
 
-    ctx.strokeStyle = "black";
+    ctx.strokeStyle = "rgb(255, 255, 255)";
     ctx.lineWidth = 3;
 
     // Important : on dessine le bord APRÈS les cellules
@@ -87,20 +87,18 @@ export function createRenderer(canvas, { gridW, gridH, cellSize }) {
   // =========================
   // Fonction principale de rendu
   // =========================
-  function render() {
-    clear();          // 1) on efface
-    drawGrid();       // 2) on dessine la grille
+  function renderWorld(world) {
+    clear();
+    drawGrid();
 
-    // Les cellules seront dessinées depuis l'extérieur
-    // (main.js ou plus tard le moteur de simulation)
+    // Carottes = pixels orange
+    for (const carrot of world.carrots.values()) {
+      fillCell(carrot.x, carrot.y, "orange");
+    }
 
-    drawWorldBorder(); // 3) on dessine le bord EN DERNIER
+    // Important: le bord en dernier pour rester visible
+    drawWorldBorder();
   }
 
-  // On expose les fonctions utiles à l'extérieur
-  return {
-    render,
-    fillCell,
-    drawWorldBorder
-  };
+  return { renderWorld };
 }

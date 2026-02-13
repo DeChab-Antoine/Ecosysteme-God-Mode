@@ -1,22 +1,41 @@
+// src/main.js
+import { createWorld } from "./world.js";
+import { mulberry32 } from "./rng.js";
 import { createRenderer } from "./renderer.js";
+import { updateCarrotSpawns } from "./systems/carrotSystem.js";
 
 const canvas = document.getElementById("game");
 
-// Configuration du monde
-const WORLD = {
+// Paramètres du monde
+const world = createWorld({
   gridW: 60,
-  gridH: 40,
-  cellSize: 12,
+  gridH: 35,
+  dayTicks: 80,
+  seed: 12345
+});
+world.rand = mulberry32(world.seed);
+
+const renderer = createRenderer(canvas, {
+  gridW: world.gridW,
+  gridH: world.gridH,
+  cellSize: 12
+});
+
+// Paramètres carottes (à tuner pour “stabilité”)
+const carrotConfig = {
+  maxCarrots: 60,
+  spawnAttemptsPerTick: 1,
+  spawnChance: 0.5,
+  valE: 25
 };
 
-const renderer = createRenderer(canvas, WORLD);
+const TICK_MS = 80;
 
-// On lance le rendu de base
-renderer.render();
+setInterval(() => {
+  // 1) Update logique
+  updateCarrotSpawns(world, carrotConfig);
+  world.tick++;
 
-// On teste en colorant une cellule AU BORD
-renderer.fillCell(0, 0, "orange");                                  // coin haut gauche
-renderer.fillCell(WORLD.gridW - 1, WORLD.gridH - 1, "orange");      // coin bas droit
-
-// On dessine le bord pour garantir qu'il reste visible
-renderer.drawWorldBorder();
+  // 2) Render
+  renderer.renderWorld(world);
+}, TICK_MS);
