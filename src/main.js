@@ -3,6 +3,8 @@ import { createWorld } from "./world.js";
 import { mulberry32 } from "./rng.js";
 import { createRenderer } from "./renderer.js";
 import { updateCarrotSpawns } from "./systems/carrotSystem.js";
+import { spawnInitialHumans } from "./systems/humanSpawnSystem.js";
+
 
 const canvas = document.getElementById("game");
 
@@ -11,7 +13,7 @@ const world = createWorld({
   gridW: 60,
   gridH: 35,
   dayTicks: 80,
-  seed: 12345
+  seed: 1
 });
 world.rand = mulberry32(world.seed);
 
@@ -21,13 +23,24 @@ const renderer = createRenderer(canvas, {
   cellSize: 12
 });
 
-// Paramètres carottes (à tuner pour “stabilité”)
+// Paramètres carottes 
 const carrotConfig = {
   maxCarrots: 60,
   spawnAttemptsPerTick: 1,
-  spawnChance: 0.5,
+  spawnChance: 0.3,
   valE: 25
 };
+
+// Paramètres Spawn initial des humains
+spawnInitialHumans(world, {
+  count: 10,
+  maxAttempts: 5000,
+  humanTemplate: {
+    E: 100,
+    Emax: 100,
+    R: 6
+  }
+});
 
 const TICK_MS = 80;
 

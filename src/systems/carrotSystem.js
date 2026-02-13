@@ -4,14 +4,15 @@ import { cellKey } from "../world.js";
 function trySpawnCarrot(world, x, y, valE) {
   const key = cellKey(world, x, y);
 
-  // Refuse si case déjà occupée
-  if (world.occupied.has(key)) return false;
+  // Refuse si case déjà occupée par Humain ou Carotte
+  if (world.occupiedCarrots.has(key)) return false;
+  if (world.occupiedHumans.has(key)) return false;
 
   // Ajoute la carotte
   world.carrots.set(key, { x, y, valE });
 
   // Marque occupé (important pour plus tard humains + carottes)
-  world.occupied.add(key);
+  world.occupiedCarrots.add(key);
 
   return true;
 }

@@ -93,7 +93,12 @@ export function createRenderer(canvas, { gridW, gridH, cellSize }) {
 
     // Carottes = pixels orange
     for (const carrot of world.carrots.values()) {
-      fillCell(carrot.x, carrot.y, "orange");
+        fillCell(carrot.x, carrot.y, "orange");
+    }
+
+    // Humains = pixels bleus
+    for (const human of world.humans.values()) {
+        fillCell(human.x, human.y, "rgb(215, 152, 152)");
     }
 
     // Important: le bord en dernier pour rester visible
