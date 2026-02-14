@@ -9,12 +9,15 @@ import { updateHumansDay, nightCleanup } from "./systems/humanSystem.js";
 
 
 const canvas = document.getElementById("game");
+const statsSummaryEl = document.getElementById("statsSummary");
+const statsHumansEl = document.getElementById("statsHumans");
 
 // Paramètres du monde
 const world = createWorld({
-  gridW: 60,
-  gridH: 35,
-  dayTicks: 80,
+  gridW: 80,
+  gridH: 55,
+  dayTicks: 90,
+  nightTicks: 10,
   seed: 1
 });
 world.rand = mulberry32(world.seed);
@@ -27,10 +30,10 @@ const renderer = createRenderer(canvas, {
 
 // Paramètres carottes 
 const carrotConfig = {
-  maxCarrots: 60,
+  maxCarrots: 20,
   spawnAttemptsPerTick: 1,
   spawnChance: 0.3,
-  valE: 25
+  valE: 10
 };
 
 // Paramètres Spawn initial des humains
@@ -40,34 +43,86 @@ spawnInitialHumans(world, {
   humanTemplate: {
     E: 100,
     Emax: 100,
-    R: 6
+    R: 20
   }
 });
 
 
 const humanConfig = {
-  energyDecayPerTick: 0.6, 
+  energyDecayPerTick: 0.4, 
   logEat: false            
 };
 
 
-const TICK_MS = 100;
+const TICK_MS = 1;
+
+
+// les stats
+function updateStatsUI(world, phase) {
+  // Liste des stats
+  const linesStats = [];
+  linesStats.push(`day=${Math.floor(world.tick/(world.dayTicks+world.nightTicks))}`);
+  linesStats.push(`phase=${phase.name} (t=${phase.tInPhase}/${phase.duration})`);
+  linesStats.push(`humans=${world.humans.size}`);
+  linesStats.push(`carrots=${world.carrots.size}`);
+
+  statsSummaryEl.textContent = linesStats.join("\n");
+
+  // Liste humains (on limite pour éviter un panneau infini)
+  const lines = [];
+  const maxLines = 40;
+
+  let i = 0;
+  for (const h of world.humans.values()) {
+    lines.push(`#${h.id} (${h.x},${h.y}) E=${h.E.toFixed(1)}/${h.Emax}`);
+    i++;
+    if (i >= maxLines) {
+      lines.push(`... (${world.humans.size - maxLines} autres)`);
+      break;
+    }
+  }
+
+  statsHumansEl.textContent = lines.join("\n");
+}
+
+// Jour ou Nuit 
+function getPhase(world) {
+  const cycle = world.dayTicks + world.nightTicks;
+  const t = world.tick % cycle;
+
+  if (t < world.dayTicks) {
+    return { name: "DAY", tInPhase: t, duration: world.dayTicks };
+  } else {
+    return { name: "NIGHT", tInPhase: t - world.dayTicks, duration: world.nightTicks };
+  }
+}
+
 
 setInterval(() => {
-  // Phase jour/nuit
-  const cycle = world.dayTicks + 1;
-  const t = world.tick % cycle;
-  const isDay = (t < world.dayTicks);
+  const phase = getPhase(world);
 
-  if (isDay) {
-    // Spawn carottes 
+  if (phase.name === "DAY") {
+    // JOUR : tout avance
     updateCarrotSpawns(world, carrotConfig);
     updateHumansDay(world, humanConfig);
   } else {
-    nightCleanup(world);
+    // NUIT : tout se fige
+    // On fait le nettoyage une seule fois au début de la nuit
+    if (phase.tInPhase === 0) {
+      nightCleanup(world);
+    }
+    // pas de spawn, pas de mouvement
   }
 
+  // UI
+  updateStatsUI(world, phase);
+
+  // Rendu (overlay nuit)
+  renderer.renderWorld(world, {
+    isNight: phase.name === "NIGHT",
+  });
+
   world.tick++;
-  renderer.renderWorld(world);
 }, TICK_MS);
+
 

@@ -84,6 +84,11 @@ export function createRenderer(canvas, { gridW, gridH, cellSize }) {
     );
   }
 
+  // Voile sombre par dessus pour représenter la nuit 
+  function drawNightOverlay() {
+    ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
 
   // Dessine un cercle de vision (rayon en cellules => converti en pixels)
   function drawVisionCircle(xCell, yCell, rCells) {
@@ -104,7 +109,7 @@ export function createRenderer(canvas, { gridW, gridH, cellSize }) {
   // =========================
   // Fonction principale de rendu
   // =========================
-  function renderWorld(world) {
+  function renderWorld(world, view) {
     clear();
     drawGrid();
 
@@ -121,6 +126,11 @@ export function createRenderer(canvas, { gridW, gridH, cellSize }) {
     // Humains = pixels bleus
     for (const human of world.humans.values()) {
         fillCell(human.x, human.y, "rgb(215, 152, 152)");
+    }
+
+    // Si nuit : assombrir 
+    if (view.isNight) {
+      drawNightOverlay(); 
     }
 
     // Important: le bord en dernier pour rester visible

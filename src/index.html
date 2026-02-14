@@ -5,12 +5,53 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Ecosystem-God-Mod</title>
     <style>
-      body { margin: 0; background: rgb(0, 0, 0); display: grid; place-items: center; height: 100vh; }
-      canvas { image-rendering: pixelated; } 
+      body { margin: 0; background: rgb(0, 0, 0); height: 100vh; }
+      #layout {
+        display: flex;
+        height: 100vh;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 12px;
+        box-sizing: border-box;
+      }
+      canvas { image-rendering: pixelated; background: rgb(255, 255, 255); }
+
+      #stats {
+        width: 320px;
+        border: 2px solid black;
+        padding: 10px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        background: #fff;
+        height: fit-content;
+        max-height: calc(100vh - 24px);
+        overflow: auto;
+      }
+      #stats h3 { 
+        margin: 0 0 8px 0;
+        font-size: 25px; 
+      }
+      #statsSummary { 
+        margin: 0 0 8px 0; 
+        font-size: 20px;
+      }
+      #statsHumans { 
+        margin: 0; 
+        font-size: 14px;
+      }
     </style>
+
   </head>
   <body>
-    <canvas id="game"></canvas>
+    <div id="layout">
+      <canvas id="game"></canvas>
+
+      <div id="stats">
+        <h3>Stats</h3>
+        <pre id="statsSummary"></pre>
+        <pre id="statsHumans"></pre>
+      </div>
+    </div>
+
     <script type="module" src="./main.js"></script>
   </body>
 </html>

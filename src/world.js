@@ -5,12 +5,14 @@ export function cellKey(world, x, y) {
   return y * world.gridW + x;
 }
 
-export function createWorld({ gridW, gridH, dayTicks, seed }) {
+export function createWorld({ gridW, gridH, dayTicks, nightTicks, seed }) {
   return {
     gridW,
     gridH,
     dayTicks,
+    nightTicks,
     tick: 0,
+
 
     // RNG seedé (fonction rand())
     seed,
