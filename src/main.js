@@ -4,6 +4,8 @@ import { mulberry32 } from "./rng.js";
 import { createRenderer } from "./renderer.js";
 import { updateCarrotSpawns } from "./systems/carrotSystem.js";
 import { spawnInitialHumans } from "./systems/humanSpawnSystem.js";
+import { updateHumansDay, nightCleanup } from "./systems/humanSystem.js";
+
 
 
 const canvas = document.getElementById("game");
@@ -42,13 +44,30 @@ spawnInitialHumans(world, {
   }
 });
 
-const TICK_MS = 80;
+
+const humanConfig = {
+  energyDecayPerTick: 0.6, 
+  logEat: false            
+};
+
+
+const TICK_MS = 100;
 
 setInterval(() => {
-  // 1) Update logique
-  updateCarrotSpawns(world, carrotConfig);
-  world.tick++;
+  // Phase jour/nuit
+  const cycle = world.dayTicks + 1;
+  const t = world.tick % cycle;
+  const isDay = (t < world.dayTicks);
 
-  // 2) Render
+  if (isDay) {
+    // Spawn carottes 
+    updateCarrotSpawns(world, carrotConfig);
+    updateHumansDay(world, humanConfig);
+  } else {
+    nightCleanup(world);
+  }
+
+  world.tick++;
   renderer.renderWorld(world);
 }, TICK_MS);
+

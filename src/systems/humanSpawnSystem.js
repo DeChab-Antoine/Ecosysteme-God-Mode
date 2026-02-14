@@ -11,7 +11,7 @@ function makeHuman(world, x, y, template) {
     y,
     E: template.E,
     Emax: template.Emax,
-    R: template.R
+    R: template.R,
   };
 
   world.humans.set(id, human);

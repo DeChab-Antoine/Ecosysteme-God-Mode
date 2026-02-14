@@ -84,6 +84,23 @@ export function createRenderer(canvas, { gridW, gridH, cellSize }) {
     );
   }
 
+
+  // Dessine un cercle de vision (rayon en cellules => converti en pixels)
+  function drawVisionCircle(xCell, yCell, rCells) {
+    const cx = xCell * cellSize + cellSize / 2; // centre de la cellule
+    const cy = yCell * cellSize + cellSize / 2;
+    const rPx = rCells * cellSize;
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, rPx, 0, Math.PI * 2);
+
+    // Trait léger pour ne pas polluer l'écran
+    ctx.strokeStyle = "rgba(30, 143, 255, 0.14)"; // proche du bleu
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+
   // =========================
   // Fonction principale de rendu
   // =========================
@@ -94,6 +111,11 @@ export function createRenderer(canvas, { gridW, gridH, cellSize }) {
     // Carottes = pixels orange
     for (const carrot of world.carrots.values()) {
         fillCell(carrot.x, carrot.y, "orange");
+    }
+
+    // La vision des humains
+    for (const human of world.humans.values()) {
+        drawVisionCircle(human.x, human.y, human.R);
     }
 
     // Humains = pixels bleus
