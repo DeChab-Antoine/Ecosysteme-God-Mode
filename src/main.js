@@ -17,7 +17,7 @@ const world = createWorld({
   gridW: 80,
   gridH: 55,
   dayTicks: 90,
-  nightTicks: 10,
+  nightTicks: 1,
   seed: 1
 });
 world.rand = mulberry32(world.seed);
@@ -33,7 +33,7 @@ const carrotConfig = {
   maxCarrots: 20,
   spawnAttemptsPerTick: 1,
   spawnChance: 0.3,
-  valE: 10
+  valE: 1
 };
 
 // Paramètres Spawn initial des humains
@@ -43,7 +43,9 @@ spawnInitialHumans(world, {
   humanTemplate: {
     E: 100,
     Emax: 100,
-    R: 20
+    R: 20,
+
+    lifespan: 20
   }
 });
 
@@ -54,7 +56,7 @@ const humanConfig = {
 };
 
 
-const TICK_MS = 1;
+const TICK_MS = 100;
 
 
 // les stats
@@ -74,7 +76,7 @@ function updateStatsUI(world, phase) {
 
   let i = 0;
   for (const h of world.humans.values()) {
-    lines.push(`#${h.id} (${h.x},${h.y}) E=${h.E.toFixed(1)}/${h.Emax}`);
+    lines.push(`#${h.id} (${h.x},${h.y}) E=${h.E.toFixed(1)}/${h.Emax} age=${h.age}/${h.lifespan}`);
     i++;
     if (i >= maxLines) {
       lines.push(`... (${world.humans.size - maxLines} autres)`);

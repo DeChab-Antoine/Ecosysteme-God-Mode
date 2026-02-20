@@ -67,10 +67,24 @@ function randomStep(world, human) {
 
 // Un tick "JOUR" pour 1 humain
 function updateHumanDay(world, human, config) {
-  // 1) perte d'énergie
+  // si trop vieux supprimer energie 
+  if (human.age >= human.lifespan) {
+    human.E = 0;
+    return; 
+  }
+
+  // si plus d'énergie peut plus bouger (et va mourir)
+  if (human.E < 0) {
+    return;
+  }
+
+  // perte d'énergie
   human.E -= config.energyDecayPerTick;
 
-  // 2) comportement
+  // age augmente 
+  human.age++
+
+  // comportement
   const target = findNearestCarrotInVision(world, human);
 
   if (target) {
@@ -79,7 +93,7 @@ function updateHumanDay(world, human, config) {
     randomStep(world, human, config);
   }
 
-  // 3) si sur carotte => manger
+  // si sur carotte => manger
   const key = cellKey(world, human.x, human.y);
   if (world.occupiedCarrots.has(key)) {
     // récup valE avant suppression
@@ -106,6 +120,7 @@ export function nightCleanup(world) {
       const key = cellKey(world, human.x, human.y);
       world.occupiedHumans.delete(key);
       world.humans.delete(id);
-    }
+
+    } 
   }
 }

@@ -9,9 +9,18 @@ function makeHuman(world, x, y, template) {
     id,
     x,
     y,
+
+    // Energie
     E: template.E,
     Emax: template.Emax,
+
+    // Vision rayon
     R: template.R,
+
+    // Age
+    age: 0,
+    lifespan: template.lifespan
+
   };
 
   world.humans.set(id, human);
