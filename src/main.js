@@ -30,30 +30,32 @@ const renderer = createRenderer(canvas, {
 
 // Paramètres carottes 
 const carrotConfig = {
-  maxCarrots: 20,
-  spawnAttemptsPerTick: 1,
-  spawnChance: 0.3,
-  valE: 1
+  maxCarrots: 60,
+  spawnAttemptsPerTick: 5,
+  spawnChance: 1,
+  valE: 10
 };
 
 // Paramètres Spawn initial des humains
 spawnInitialHumans(world, {
-  count: 10,
+  count: 2,
   maxAttempts: 5000,
   humanTemplate: {
+    // Energie
     E: 100,
     Emax: 100,
-    R: 20,
+    energyDecayPerTick: 0.4,
 
-    lifespan: 20
+    R: 30,
+
+    lifespan: 2000,
+
+    // Reproduction 
+    reproductionCost: 20,
+    reproductionTick: 0,
+    reproductionTickDelay: 60
   }
 });
-
-
-const humanConfig = {
-  energyDecayPerTick: 0.4, 
-  logEat: false            
-};
 
 
 const TICK_MS = 100;
@@ -106,7 +108,7 @@ setInterval(() => {
   if (phase.name === "DAY") {
     // JOUR : tout avance
     updateCarrotSpawns(world, carrotConfig);
-    updateHumansDay(world, humanConfig);
+    updateHumansDay(world);
   } else {
     // NUIT : tout se fige
     // On fait le nettoyage une seule fois au début de la nuit

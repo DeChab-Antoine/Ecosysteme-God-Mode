@@ -1,7 +1,7 @@
 import { cellKey } from "../world.js";
 
 // Crée un humain (factory)
-function makeHuman(world, x, y, template) {
+export function makeHuman(world, x, y, template) {
   const id = world.nextHumanId++;
 
   // On clone le template et on ajoute l'id + position
@@ -13,14 +13,19 @@ function makeHuman(world, x, y, template) {
     // Energie
     E: template.E,
     Emax: template.Emax,
+    energyDecayPerTick: template.energyDecayPerTick,
 
     // Vision rayon
     R: template.R,
 
     // Age
     age: 0,
-    lifespan: template.lifespan
-
+    lifespan: template.lifespan,
+    
+    // Reproduction 
+    reproductionCost: template.reproductionCost,
+    reproductionTick: template.reproductionTick,
+    reproductionTickDelay: template.reproductionTickDelay
   };
 
   world.humans.set(id, human);
