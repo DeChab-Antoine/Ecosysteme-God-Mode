@@ -1,44 +1,75 @@
 import { cellKey } from "../world.js";
+import { removeCarrotAt } from "./worldOps.js";
 
-// Essaie de spawn une carotte sur une case libre
-function trySpawnCarrot(world, x, y, valE) {
+/**
+ * Essaie de spawn une carotte sur une case libre.
+ * - interdit si déjà carotte
+ * - interdit si déjà humain (même règle que ton spawn humains)
+ */
+function trySpawnCarrot(world, x, y, config) {
   const key = cellKey(world, x, y);
 
-  // Refuse si case déjà occupée par Humain ou Carotte
+  // Case déjà occupée
   if (world.occupiedCarrots.has(key)) return false;
   if (world.occupiedHumans.has(key)) return false;
 
-  // Ajoute la carotte
-  world.carrots.set(key, { x, y, valE });
+  // Carotte = entité avec cycle de vie (pourriture)
+  world.carrots.set(key, {
+    x,
+    y,
+    valE: config.valE,
+    age: 0,
+    maxAge: config.maxAge
+  });
 
-  // Marque occupé (important pour plus tard humains + carottes)
   world.occupiedCarrots.add(key);
-
   return true;
 }
 
-// Spawn "probabiliste par tick" mais stable via un cap + tentatives limitées
+/**
+ * Spawn probabiliste par tick avec cap global (stable).
+ * config attendu :
+ * - maxCarrots
+ * - spawnAttemptsPerTick
+ * - spawnChance
+ * - valE
+ * - maxAge
+ */
 export function updateCarrotSpawns(world, config) {
   const {
-    maxCarrots,           // cap global => stabilité
-    spawnAttemptsPerTick, // nb d'essais aléatoires par tick
-    spawnChance,          // probabilité de réussir un essai
-    valE
+    maxCarrots,
+    spawnAttemptsPerTick,
+    spawnChance
   } = config;
 
-  // Si déjà au cap, ne spawn plus
   if (world.carrots.size >= maxCarrots) return;
 
   for (let i = 0; i < spawnAttemptsPerTick; i++) {
     if (world.carrots.size >= maxCarrots) break;
 
-    // Un essai n'aboutit que selon spawnChance
     if (world.rand() > spawnChance) continue;
 
-    // Choix d'une case aléatoire
     const x = Math.floor(world.rand() * world.gridW);
     const y = Math.floor(world.rand() * world.gridH);
 
-    trySpawnCarrot(world, x, y, valE);
+    trySpawnCarrot(world, x, y, config);
+  }
+}
+
+/**
+ * Vieillissement / pourriture des carottes.
+ * À appeler pendant le JOUR (comme l'âge des humains).
+ */
+export function updateCarrotsAging(world) {
+  // ⚠️ On itère sur une copie car on supprime pendant la boucle
+  for (const carrot of Array.from(world.carrots.values())) {
+    carrot.age += 1;
+
+    if (carrot.age >= carrot.maxAge) {
+      // suppression propre via worldOps (met à jour Map + Set)
+      removeCarrotAt(world, carrot.x, carrot.y);
+
+      console.log(`Carotte pourrie à (${carrot.x},${carrot.y})`);
+    }
   }
 }

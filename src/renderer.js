@@ -118,11 +118,6 @@ export function createRenderer(canvas, { gridW, gridH, cellSize }) {
         fillCell(carrot.x, carrot.y, "orange");
     }
 
-    // La vision des humains
-    for (const human of world.humans.values()) {
-        drawVisionCircle(human.x, human.y, human.R);
-    }
-
     // Humains = pixels bleus
     for (const human of world.humans.values()) {
         fillCell(human.x, human.y, "rgb(215, 152, 152)");

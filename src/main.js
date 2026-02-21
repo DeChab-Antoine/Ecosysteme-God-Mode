@@ -2,7 +2,7 @@
 import { createWorld } from "./world.js";
 import { mulberry32 } from "./rng.js";
 import { createRenderer } from "./renderer.js";
-import { updateCarrotSpawns } from "./systems/carrotSystem.js";
+import { updateCarrotSpawns, updateCarrotsAging } from "./systems/carrotSystem.js";
 import { spawnInitialHumans } from "./systems/humanSpawnSystem.js";
 import { updateHumansDay, nightCleanup } from "./systems/humanSystem.js";
 
@@ -16,7 +16,7 @@ const statsHumansEl = document.getElementById("statsHumans");
 const world = createWorld({
   gridW: 80,
   gridH: 55,
-  dayTicks: 90,
+  dayTicks: 100,
   nightTicks: 1,
   seed: 1
 });
@@ -33,27 +33,28 @@ const carrotConfig = {
   maxCarrots: 60,
   spawnAttemptsPerTick: 5,
   spawnChance: 1,
-  valE: 10
+  valE: 10,
+  maxAge: 100,
 };
 
 // Paramètres Spawn initial des humains
 spawnInitialHumans(world, {
-  count: 2,
+  count: 100,
   maxAttempts: 5000,
   humanTemplate: {
     // Energie
     E: 100,
-    Emax: 100,
-    energyDecayPerTick: 0.4,
+    Emax: 200,
+    energyDecayPerTick: 0.3,
 
     R: 30,
 
-    lifespan: 2000,
+    lifespan: 3000,
 
     // Reproduction 
-    reproductionCost: 20,
-    reproductionTick: 0,
-    reproductionTickDelay: 60
+    reproductionCost: 60,
+    reproductionTick: 500,
+    reproductionTickDelay: 500
   }
 });
 
@@ -108,6 +109,7 @@ setInterval(() => {
   if (phase.name === "DAY") {
     // JOUR : tout avance
     updateCarrotSpawns(world, carrotConfig);
+    updateCarrotsAging(world);
     updateHumansDay(world);
   } else {
     // NUIT : tout se fige
