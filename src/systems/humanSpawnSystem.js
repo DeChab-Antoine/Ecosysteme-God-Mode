@@ -22,33 +22,30 @@ export function makeHuman(world, x, y, template) {
     age: 0,
     lifespan: template.lifespan,
     
-    // Reproduction 
-    reproductionCost: template.reproductionCost,
-    reproductionTick: template.reproductionTick,
-    reproductionTickDelay: template.reproductionTickDelay
+    // Clonage 
+    duplicationCost: template.duplicationCost,
+    duplicationTick: template.duplicationTick,
+    duplicationTickDelay: template.duplicationTickDelay
   };
 
   world.humans.set(id, human);
 }
 
-// Essaie de placer un humain sur une case libre (pas d'humain, pas de carotte)
-function trySpawnHuman(world, x, y, template) {
+// Essaie de placer un humain sur une case libre 
+function trySpawnHuman(world, x, y, createHumanTemplate) {
   const key = cellKey(world, x, y);
 
   if (world.occupiedHumans.has(key)) return false;
   if (world.occupiedCarrots.has(key)) return false;
 
+  const template = createHumanTemplate(world); 
   makeHuman(world, x, y, template);
   world.occupiedHumans.add(key);
   return true;
 }
 
 export function spawnInitialHumans(world, config) {
-  const {
-    count,
-    maxAttempts,
-    humanTemplate
-  } = config;
+  const { count, maxAttempts, createHumanTemplate } = config;
 
   let spawned = 0;
   let attempts = 0;
@@ -59,8 +56,7 @@ export function spawnInitialHumans(world, config) {
     const x = Math.floor(world.rand() * world.gridW);
     const y = Math.floor(world.rand() * world.gridH);
 
-    const ok = trySpawnHuman(world, x, y, humanTemplate);
+    const ok = trySpawnHuman(world, x, y, createHumanTemplate);
     if (ok) spawned++;
   }
-
 }

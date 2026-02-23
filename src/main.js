@@ -10,7 +10,6 @@ import { updateHumansDay, nightCleanup } from "./systems/humanSystem.js";
 
 const canvas = document.getElementById("game");
 const statsSummaryEl = document.getElementById("statsSummary");
-const statsHumansEl = document.getElementById("statsHumans");
 
 // Paramètres du monde
 const world = createWorld({
@@ -18,7 +17,7 @@ const world = createWorld({
   gridH: 55,
   dayTicks: 100,
   nightTicks: 1,
-  seed: 1
+  seed: crypto.getRandomValues(new Uint32Array(1))[0] // seed aléatoire
 });
 world.rand = mulberry32(world.seed);
 
@@ -37,27 +36,35 @@ const carrotConfig = {
   maxAge: 100,
 };
 
+
+function computeEmax() {
+  return 100 + world.rand() * 100;
+}
+
 // Paramètres Spawn initial des humains
 spawnInitialHumans(world, {
-  count: 100,
+  count: 10,
   maxAttempts: 5000,
-  humanTemplate: {
-    // Energie
-    E: 100,
-    Emax: 100 + Math.random() * 100,
-    energyDecayPerTick: 0.25 + Math.random() * 0.1,
 
-    R: 5 + Math.random() * 10,
+  createHumanTemplate: (world) => {
+    const emax = computeEmax();
 
-    lifespan: 500 + Math.random() * 1000,
+    return {
+      E: 100,
+      Emax: emax,
+      energyDecayPerTick: emax * 1.0025 - emax,
 
-    // Reproduction 
-    reproductionCost: 60,
-    reproductionTick: 500,
-    reproductionTickDelay: 500
+      R: 5 + world.rand() * 10,
+
+      lifespan: 500 + world.rand() * 1000,
+
+      duplicationCost: 60,
+      duplicationTick: 0,
+      duplicationTickDelay: 400 + world.rand() * 200
+    };
+    
   }
 });
-
 
 const TICK_MS = 1;
 
@@ -94,6 +101,7 @@ function updateStatsUI(world, phase) {
 
   // Liste des stats
   const linesStats = [];
+  linesStats.push(`Seed=${world.seed}`);
   linesStats.push(`day=${Math.floor(world.tick/(world.dayTicks+world.nightTicks))}`);
   linesStats.push(`phase=${phase.name} (t=${phase.tInPhase}/${phase.duration})`);
   linesStats.push(`humans=${world.humans.size}`);

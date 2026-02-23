@@ -40,42 +40,13 @@ function isAdjacentOrSame(a, b) {
 }
 
 
-function canReproduce(human) {
+function canDuplicate(human) {
   return (
-    // A envie de se reproduire 
-    human.reproductionTick >= human.reproductionTickDelay &&
-    // Assez d'énergie pour chercher à se reproduire
-    human.E >= 2*human.reproductionCost
+    // A envie de se dupliquer 
+    human.duplicationTick >= human.duplicationTickDelay &&
+    // Assez d'énergie pour se dupliquer
+    human.E >= (human.Emax * 0.95)
   );
-}
-
-
-// Cherche un humain la plus proche dans le rayon R pour se reproduire
-function findNearestHumanInVision(world, human) {
-  if (!canReproduce(human)) {
-    return null;
-  }
-
-  const R2 = human.R * human.R;
-
-  let best = null;
-  let bestD2 = Infinity;
-
-  // Simple (bruteforce) : 
-  for (const h of world.humans.values()) {
-    // ne pas choisir soi même
-    if (human.id == h.id) continue;
-
-    if (!canReproduce(human)) continue;
-
-    const d2 = dist2(human.x, human.y, h.x, h.y);
-    
-    if (d2 <= R2 && d2 < bestD2) {
-      bestD2 = d2;
-      best = h;
-    }
-  }
-  return best; 
 }
 
 
@@ -108,23 +79,17 @@ function findFreeNeighborCell(world, x, y) {
 }
 
 
-function avg(a, b) {
-  return (a + b) / 2;
-}
-
-function mutate(a, b) {
-    const mean = avg(a,b);
-    const factor = 0.5 + Math.random() * 1;
-    return mean * factor;
+function mutate(a) {
+    const factor = 1 + Math.random() * 0;
+    return a * factor;
 }
 
 
 // Crée le template bébé
-function createChildTemplate(parentA, parentB) {
-    const Emax = mutate(parentA.Emax, parentB.Emax);
-    const energy = mutate(parentA.energyDecayPerTick, parentB.energyDecayPerTick);
-    const r = mutate(parentA.R, parentB.R);
-    const lifespan = mutate(parentA.lifespan, parentB.lifespan);
+function createChildTemplate(parent) {
+    const Emax = mutate(parent.Emax);
+    const r = mutate(parent.R);
+    const lifespan = mutate(parent.lifespan);
 
 
 
@@ -132,7 +97,7 @@ function createChildTemplate(parentA, parentB) {
         // Energie
         E: Emax,
         Emax: Emax,
-        energyDecayPerTick: energy,
+        energyDecayPerTick: parent.Emax * 1.0025 - parent.Emax,
 
         // Vision rayon
         R: r,
@@ -141,32 +106,30 @@ function createChildTemplate(parentA, parentB) {
         age: 0,
         lifespan: lifespan,
         
-        // Reproduction 
-        reproductionCost: parentA.reproductionCost,
-        reproductionTick: parentA.reproductionTick,
-        reproductionTickDelay: parentA.reproductionTickDelay
+        // Duplication 
+        duplicationCost: parent.duplicationCost,
+        duplicationTick: 0,
+        duplicationTickDelay: parent.duplicationTickDelay
     }
 }
 
 
 // crée le bébé
-export function tryReproduce(world, parentA, parentB) {
-  const spot = findFreeNeighborCell(world, parentA.x, parentA.y);
+export function tryDuplicate(world, parent) {
+  const spot = findFreeNeighborCell(world, parent.x, parent.y);
   if (!spot) return false;
 
   // Crée un adulte
-  const childTemplate = createChildTemplate(parentA, parentB);
+  const childTemplate = createChildTemplate(parent);
   makeHuman(world, spot.x, spot.y, childTemplate);
 
   // Ajout au world
   world.occupiedHumans.add(cellKey(world, spot.x, spot.y));
 
-  // Coût énergie + reset cooldown parents
-  parentA.E -= parentA.reproductionCost;
-  parentB.E -= parentB.reproductionCost;
+  // Coût énergie + reset cooldown parent
+  parent.E -= parent.duplicationCost;
 
-  parentA.reproductionTick = 0;
-  parentB.reproductionTick = 0;
+  parent.duplicationTick = 0;
 
   return true;
 }
@@ -232,36 +195,21 @@ function updateHumanDay(world, human) {
   human.age++;
 
   // envie de se reproduire 
-  human.reproductionTick++;
+  human.duplicationTick++;
 
   // comportement
-  let partner = findNearestHumanInVision(world, human);
-  let target = null;
-
-  if (partner) {
-    // Si on est déjà proche => tenter repro
-    if (isAdjacentOrSame(human, partner) && canReproduce(human) && canReproduce(partner)) {
-      if (findFreeNeighborCell(world, human.x, human.y)) {
-        console.log(`Humain#${human.id} se reproduit avec Humain#${partner.id}`);
-        tryReproduce(world, human, partner);
-      }
-    } else {
-      // Sinon on se rapproche du partenaire
-      target = partner;
-    }
-  } else {
-    // Pas de partenaire => carotte
-    target = findNearestCarrotInVision(world, human);
-  }
+  let target = findNearestCarrotInVision(world, human);
 
   if (target) {
-    // ✅ IMPORTANT : si target est un humain et qu'on est adjacent, ne pas essayer d'entrer sur sa case
-    if (!(partner && isAdjacentOrSame(human, partner))) {
-      stepTowards(world, human, target.x, target.y);
-    }
+    stepTowards(world, human, target.x, target.y);
   } else {
     randomStep(world, human);
   }
+
+  if (canDuplicate(human)) {
+    tryDuplicate(world, human);
+  }
+
 
   // si sur carotte => manger
   const key = cellKey(world, human.x, human.y);
