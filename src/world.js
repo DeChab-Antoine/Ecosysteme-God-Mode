@@ -12,6 +12,7 @@ export function createWorld({ gridW, gridH, dayTicks, nightTicks, seed }) {
     dayTicks,
     nightTicks,
     tick: 0,
+    day: 0,
 
 
     // RNG seedé (fonction rand())

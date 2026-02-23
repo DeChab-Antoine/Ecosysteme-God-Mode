@@ -5,6 +5,7 @@ import { createRenderer } from "./renderer.js";
 import { updateCarrotSpawns, updateCarrotsAging } from "./systems/carrotSystem.js";
 import { spawnInitialHumans } from "./systems/humanSpawnSystem.js";
 import { updateHumansDay, nightCleanup } from "./systems/humanSystem.js";
+import { createPopulationChart } from "./ui/populationChart.js";
 
 
 
@@ -29,7 +30,7 @@ const renderer = createRenderer(canvas, {
 
 // Paramètres carottes 
 const carrotConfig = {
-  maxCarrots: 60,
+  maxCarrots: 30,
   spawnAttemptsPerTick: 5,
   spawnChance: 1,
   valE: 10,
@@ -102,7 +103,7 @@ function updateStatsUI(world, phase) {
   // Liste des stats
   const linesStats = [];
   linesStats.push(`Seed=${world.seed}`);
-  linesStats.push(`day=${Math.floor(world.tick/(world.dayTicks+world.nightTicks))}`);
+  linesStats.push(`day=${world.day}`);
   linesStats.push(`phase=${phase.name} (t=${phase.tInPhase}/${phase.duration})`);
   linesStats.push(`humans=${world.humans.size}`);
   linesStats.push(`carrots=${world.carrots.size}`);
@@ -128,6 +129,23 @@ function getPhase(world) {
 }
 
 
+// le graphe nb humain dans le temps 
+const popChart = createPopulationChart();
+
+const SAMPLE_EVERY = 1;   // un point tout les jours
+const MAX_POINTS = 3000;    
+
+function stepSimulationOneDay(world) {
+  updateHumansDay(world);
+  nightCleanup(world);
+
+  if (world.day % SAMPLE_EVERY === 0) {
+    popChart.pushPoint(world.day, world.humans.size);
+    popChart.keepLast(MAX_POINTS);
+  }
+}
+
+
 setInterval(() => {
   const phase = getPhase(world);
 
@@ -141,6 +159,8 @@ setInterval(() => {
     // On fait le nettoyage une seule fois au début de la nuit
     if (phase.tInPhase === 0) {
       nightCleanup(world);
+      world.day++;
+      stepSimulationOneDay(world);
     }
     // pas de spawn, pas de mouvement
   }
