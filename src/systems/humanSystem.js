@@ -107,13 +107,56 @@ function findFreeNeighborCell(world, x, y) {
   return null;
 }
 
+
+function avg(a, b) {
+  return (a + b) / 2;
+}
+
+function mutate(a, b) {
+    const mean = avg(a,b);
+    const factor = 0.5 + Math.random() * 1;
+    return mean * factor;
+}
+
+
+// Crée le template bébé
+function createChildTemplate(parentA, parentB) {
+    const Emax = mutate(parentA.Emax, parentB.Emax);
+    const energy = mutate(parentA.energyDecayPerTick, parentB.energyDecayPerTick);
+    const r = mutate(parentA.R, parentB.R);
+    const lifespan = mutate(parentA.lifespan, parentB.lifespan);
+
+
+
+    return {
+        // Energie
+        E: Emax,
+        Emax: Emax,
+        energyDecayPerTick: energy,
+
+        // Vision rayon
+        R: r,
+
+        // Age
+        age: 0,
+        lifespan: lifespan,
+        
+        // Reproduction 
+        reproductionCost: parentA.reproductionCost,
+        reproductionTick: parentA.reproductionTick,
+        reproductionTickDelay: parentA.reproductionTickDelay
+    }
+}
+
+
 // crée le bébé
 export function tryReproduce(world, parentA, parentB) {
   const spot = findFreeNeighborCell(world, parentA.x, parentA.y);
   if (!spot) return false;
 
-  // Crée un adulte (simple)
-  makeHuman(world, spot.x, spot.y, parentA);
+  // Crée un adulte
+  const childTemplate = createChildTemplate(parentA, parentB);
+  makeHuman(world, spot.x, spot.y, childTemplate);
 
   // Ajout au world
   world.occupiedHumans.add(cellKey(world, spot.x, spot.y));

@@ -44,12 +44,12 @@ spawnInitialHumans(world, {
   humanTemplate: {
     // Energie
     E: 100,
-    Emax: 200,
-    energyDecayPerTick: 0.3,
+    Emax: 100 + Math.random() * 100,
+    energyDecayPerTick: 0.25 + Math.random() * 0.1,
 
-    R: 30,
+    R: 5 + Math.random() * 10,
 
-    lifespan: 3000,
+    lifespan: 500 + Math.random() * 1000,
 
     // Reproduction 
     reproductionCost: 60,
@@ -59,11 +59,39 @@ spawnInitialHumans(world, {
 });
 
 
-const TICK_MS = 100;
+const TICK_MS = 1;
 
 
 // les stats
 function updateStatsUI(world, phase) {
+  const humanCount = world.humans.size;
+
+  let avgE = 0;
+  let avgEmax = 0;
+  let avgAge = 0;
+  let avgLifespan = 0;
+  let avgR = 0;
+  let avgEnergyDecayPerTick = 0;
+
+  if (humanCount > 0) {
+
+    for (const h of world.humans.values()) {
+      avgE += h.E;
+      avgEmax += h.Emax;
+      avgAge += h.age;
+      avgLifespan += h.lifespan;
+      avgR += h.R;
+      avgEnergyDecayPerTick += h.energyDecayPerTick;
+    }
+
+    avgE /= humanCount;
+    avgEmax /= humanCount;
+    avgAge /= humanCount;
+    avgLifespan /= humanCount;
+    avgR /= humanCount;
+    avgEnergyDecayPerTick /= humanCount;
+  }
+
   // Liste des stats
   const linesStats = [];
   linesStats.push(`day=${Math.floor(world.tick/(world.dayTicks+world.nightTicks))}`);
@@ -71,23 +99,12 @@ function updateStatsUI(world, phase) {
   linesStats.push(`humans=${world.humans.size}`);
   linesStats.push(`carrots=${world.carrots.size}`);
 
+  linesStats.push(`avgE=${avgE.toFixed(1)} / ${avgEmax.toFixed(1)}`);
+  linesStats.push(`avgAge=${avgAge.toFixed(1)} / ${avgLifespan.toFixed(1)}`);
+  linesStats.push(`avgVision=${avgR.toFixed(2)}`);
+  linesStats.push(`avgEnergyDecayPerTick=${avgEnergyDecayPerTick.toFixed(2)}`);
+
   statsSummaryEl.textContent = linesStats.join("\n");
-
-  // Liste humains (on limite pour éviter un panneau infini)
-  const lines = [];
-  const maxLines = 40;
-
-  let i = 0;
-  for (const h of world.humans.values()) {
-    lines.push(`#${h.id} (${h.x},${h.y}) E=${h.E.toFixed(1)}/${h.Emax} age=${h.age}/${h.lifespan}`);
-    i++;
-    if (i >= maxLines) {
-      lines.push(`... (${world.humans.size - maxLines} autres)`);
-      break;
-    }
-  }
-
-  statsHumansEl.textContent = lines.join("\n");
 }
 
 // Jour ou Nuit 
