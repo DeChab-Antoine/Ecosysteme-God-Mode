@@ -1,27 +1,15 @@
-import { cellKey } from "../world.js";
-import { moveHumanTo, removeCarrotAt } from "./worldOps.js";
+import { moveTo, removeCarrotAt, removePigAt, cellKey, dist2, clamp, findFreeNeighborCell, isAdjacentOrSame} from "./worldOps.js";
 import { makeHuman } from "./humanSpawnSystem.js";
 
-// Petite fonction utilitaire
-function clamp(v, lo, hi) {
-  return Math.max(lo, Math.min(hi, v));
-}
-
-// Distance au carré (évite sqrt)
-function dist2(ax, ay, bx, by) {
-  const dx = ax - bx;
-  const dy = ay - by;
-  return dx * dx + dy * dy;
-}
-
-// Cherche la carotte la plus proche dans le rayon R
-function findNearestCarrotInVision(world, human) {
+// Cherche la nourriture la plus proche dans le rayon R
+function findNearestInVision(world, human) {
   const R2 = human.R * human.R;
 
   let best = null;
   let bestD2 = Infinity;
 
   // Simple (bruteforce) : 
+  // On cherche les carottes dans le rayon de vision
   for (const c of world.carrots.values()) {
     const d2 = dist2(human.x, human.y, c.x, c.y);
     if (d2 <= R2 && d2 < bestD2) {
@@ -29,14 +17,17 @@ function findNearestCarrotInVision(world, human) {
       best = c;
     }
   }
+
+  // On cherche les cochons dans le rayon de vision
+  for (const p of world.pigs.values()) {
+    const d2 = dist2(human.x, human.y, p.x, p.y);   
+    if (d2 <= R2 && d2 < bestD2) {
+      bestD2 = d2;
+      best = p;
+    }
+  }
+
   return best; // soit {x,y,valE} soit null
-}
-
-
-function isAdjacentOrSame(a, b) {
-  const dx = Math.abs(a.x - b.x);
-  const dy = Math.abs(a.y - b.y);
-  return (dx + dy) <= 1;
 }
 
 
@@ -50,37 +41,8 @@ function canDuplicate(human) {
 }
 
 
-// Cherche une case pour faire spawn le bébé
-function findFreeNeighborCell(world, x, y) {
-  // 4 directions (tu peux ajouter diagonales si tu veux)
-  const dirs = [
-    [1, 0], [-1, 0], [0, 1], [0, -1],
-  ];
-
-  // On mélange un peu l'ordre pour ne pas avoir toujours la même direction
-  for (let i = dirs.length - 1; i > 0; i--) {
-    const j = Math.floor(world.rand() * (i + 1));
-    [dirs[i], dirs[j]] = [dirs[j], dirs[i]];
-  }
-
-  for (const [dx, dy] of dirs) {
-    const nx = x + dx;
-    const ny = y + dy;
-
-    if (nx < 0 || nx >= world.gridW) continue;
-    if (ny < 0 || ny >= world.gridH) continue;
-
-    const k = cellKey(world, nx, ny);
-    if (!world.occupiedHumans.has(k)) {
-      return { x: nx, y: ny };
-    }
-  }
-  return null;
-}
-
-
 function mutate(a) {
-    const factor = 1 + Math.random() * 0;
+    const factor = 0.8 + Math.random() * 0.4; 
     return a * factor;
 }
 
@@ -97,7 +59,7 @@ function createChildTemplate(parent) {
         // Energie
         E: Emax,
         Emax: Emax,
-        energyDecayPerTick: parent.Emax * 1.0025 - parent.Emax,
+        energyDecayPerTick: parent.energyDecayPerTick,
 
         // Vision rayon
         R: r,
@@ -144,14 +106,14 @@ function stepTowards(world, human, tx, ty) {
     ? { x: human.x + Math.sign(dx), y: human.y }
     : { x: human.x, y: human.y + Math.sign(dy) };
 
-  if (moveHumanTo(world, human, primary.x, primary.y)) return;
+  if (moveTo(world, human, primary.x, primary.y)) return;
 
   // 2) direction secondaire (l'autre axe)
   const secondary = (Math.abs(dx) >= Math.abs(dy))
     ? { x: human.x, y: human.y + Math.sign(dy) }
     : { x: human.x + Math.sign(dx), y: human.y };
 
-  if (moveHumanTo(world, human, secondary.x, secondary.y)) return;
+  if (moveTo(world, human, secondary.x, secondary.y)) return;
 
   // 3) sinon: petit déplacement aléatoire pour se dégager
   randomStep(world, human);
@@ -169,12 +131,12 @@ function randomStep(world, human) {
   else if (r === 2) ny += 1;
   else ny -= 1;
 
-  moveHumanTo(world, human, nx, ny);
+  moveTo(world, human, nx, ny);
 }
 
 
 // Un tick "JOUR" pour 1 humain
-function updateHumanDay(world, human) {
+export function updateHumanDay(world, human) {
   // si trop vieux supprimer energie 
   if (human.age >= human.lifespan) {
     human.E = 0;
@@ -198,9 +160,9 @@ function updateHumanDay(world, human) {
   human.duplicationTick++;
 
   // comportement
-  let target = findNearestCarrotInVision(world, human);
+  let target = findNearestInVision(world, human);
 
-  if (target) {
+  if (target && (human.E < human.Emax - 50) && human.duplicationTick >= human.duplicationTickDelay) {
     stepTowards(world, human, target.x, target.y);
   } else {
     randomStep(world, human);
@@ -210,9 +172,9 @@ function updateHumanDay(world, human) {
     tryDuplicate(world, human);
   }
 
-
   // si sur carotte => manger
   const key = cellKey(world, human.x, human.y);
+  
   if (world.occupiedCarrots.has(key)) {
     // récup valE avant suppression
     const carrot = world.carrots.get(key);
@@ -222,24 +184,20 @@ function updateHumanDay(world, human) {
       console.log(`Humain#${human.id} mange une carotte de val = ${carrot.valE}`);
     }
   }
-}
 
-// Tick "JOUR" : update tous les humains
-export function updateHumansDay(world) {
-  for (const human of world.humans.values()) {
-    updateHumanDay(world, human);
-  }
-}
-
-// Tick "NUIT" : supprimer les morts
-export function nightCleanup(world) {
-  for (const [id, human] of world.humans.entries()) {
-    if (human.E <= 0) {
-      console.log(`Humain#${human.id} a disparu`);
-      const key = cellKey(world, human.x, human.y);
-      world.occupiedHumans.delete(key);
-      world.humans.delete(id);
-
-    } 
+  // si sur cochon => manger
+  if (world.occupiedPigs.has(key) && (human.E < human.Emax - 50) && human.duplicationTick >= human.duplicationTickDelay) {
+    let pig = null;
+    for (const p of world.pigs.values()) {
+      if (p.x === human.x && p.y === human.y) {
+        pig = p;
+        break;
+      }
+    }  
+    if (pig) {
+      removePigAt(world, pig);
+      human.E = clamp(human.E + pig.valE, 0, human.Emax);
+      console.log(`Humain#${human.id} mange un cochon de val = ${pig.valE}`);
+    }
   }
 }

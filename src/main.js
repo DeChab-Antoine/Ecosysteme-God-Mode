@@ -4,9 +4,10 @@ import { mulberry32 } from "./rng.js";
 import { createRenderer } from "./renderer.js";
 import { updateCarrotSpawns, updateCarrotsAging } from "./systems/carrotSystem.js";
 import { spawnInitialHumans } from "./systems/humanSpawnSystem.js";
-import { updateHumansDay, nightCleanup } from "./systems/humanSystem.js";
-import { createPopulationChart } from "./ui/populationChart.js";
-
+import { spawnInitialPigs, updatePigDay } from "./systems/pigSystem.js";
+import { updateHumanDay} from "./systems/humanSystem.js";
+import { createPopulationHumansChart, createPopulationPigsChart } from "./ui/populationChart.js";
+import { cellKey } from "./systems/worldOps.js";
 
 
 const canvas = document.getElementById("game");
@@ -14,8 +15,8 @@ const statsSummaryEl = document.getElementById("statsSummary");
 
 // Paramètres du monde
 const world = createWorld({
-  gridW: 80,
-  gridH: 55,
+  gridW: 120,
+  gridH: 80,
   dayTicks: 100,
   nightTicks: 1,
   seed: crypto.getRandomValues(new Uint32Array(1))[0] // seed aléatoire
@@ -25,22 +26,18 @@ world.rand = mulberry32(world.seed);
 const renderer = createRenderer(canvas, {
   gridW: world.gridW,
   gridH: world.gridH,
-  cellSize: 12
+  cellSize: 8
 });
 
 // Paramètres carottes 
 const carrotConfig = {
-  maxCarrots: 30,
+  maxCarrots: 60,
   spawnAttemptsPerTick: 5,
   spawnChance: 1,
-  valE: 10,
-  maxAge: 100,
+  valE: 5,
+  maxAge: 500,
 };
 
-
-function computeEmax() {
-  return 100 + world.rand() * 100;
-}
 
 // Paramètres Spawn initial des humains
 spawnInitialHumans(world, {
@@ -48,22 +45,31 @@ spawnInitialHumans(world, {
   maxAttempts: 5000,
 
   createHumanTemplate: (world) => {
-    const emax = computeEmax();
-
     return {
       E: 100,
-      Emax: emax,
-      energyDecayPerTick: emax * 1.0025 - emax,
-
-      R: 5 + world.rand() * 10,
-
-      lifespan: 500 + world.rand() * 1000,
-
-      duplicationCost: 60,
-      duplicationTick: 0,
-      duplicationTickDelay: 400 + world.rand() * 200
+      Emax: 200,
+      energyDecayPerTick: 0.03,
+      R: 8,
+      lifespan: 10000,
+      duplicationCost: 150,
+      duplicationTickDelay: 1000,
+      duplicationTick: 0
     };
-    
+  }
+});
+
+
+// Paramètres Spawn initial des cochons
+spawnInitialPigs(world, {
+  count: 30,
+  maxAttempts: 5000,
+      
+  createPigTemplate: (world) => {
+    return {
+      Emax: 10,
+      lifespan: 1000,
+      valE: 50,
+    }
   }
 });
 
@@ -106,6 +112,7 @@ function updateStatsUI(world, phase) {
   linesStats.push(`day=${world.day}`);
   linesStats.push(`phase=${phase.name} (t=${phase.tInPhase}/${phase.duration})`);
   linesStats.push(`humans=${world.humans.size}`);
+  linesStats.push(`pigs=${world.pigs.size}`);
   linesStats.push(`carrots=${world.carrots.size}`);
 
   linesStats.push(`avgE=${avgE.toFixed(1)} / ${avgEmax.toFixed(1)}`);
@@ -129,22 +136,12 @@ function getPhase(world) {
 }
 
 
-// le graphe nb humain dans le temps 
-const popChart = createPopulationChart();
+// le graphe nb humain et cochon dans le temps 
+const popChartHumans = createPopulationHumansChart();
+const popChartPigs = createPopulationPigsChart();
 
 const SAMPLE_EVERY = 1;   // un point tout les jours
 const MAX_POINTS = 3000;    
-
-function stepSimulationOneDay(world) {
-  updateHumansDay(world);
-  nightCleanup(world);
-
-  if (world.day % SAMPLE_EVERY === 0) {
-    popChart.pushPoint(world.day, world.humans.size);
-    popChart.keepLast(MAX_POINTS);
-  }
-}
-
 
 setInterval(() => {
   const phase = getPhase(world);
@@ -153,14 +150,36 @@ setInterval(() => {
     // JOUR : tout avance
     updateCarrotSpawns(world, carrotConfig);
     updateCarrotsAging(world);
-    updateHumansDay(world);
+    
+    for (const human of world.humans.values()) {
+      updateHumanDay(world, human);
+    }
+
+    for (const pig of world.pigs.values()) {
+      updatePigDay(world, pig);
+    }
+
   } else {
     // NUIT : tout se fige
     // On fait le nettoyage une seule fois au début de la nuit
     if (phase.tInPhase === 0) {
-      nightCleanup(world);
+
+      // Supprimer les humains morts
+      for (const [id, human] of world.humans.entries()) {
+        if (human.E <= 0) {
+          console.log(`Humain#${human.id} a disparu`);
+          const key = cellKey(world, human.x, human.y);
+          world.occupiedHumans.delete(key);
+          world.humans.delete(id);
+
+        } 
+      }
+
       world.day++;
-      stepSimulationOneDay(world);
+      popChartHumans.pushPoint(world.day, world.humans.size);
+      popChartHumans.keepLast(MAX_POINTS);
+      popChartPigs.pushPoint(world.day, world.pigs.size);
+      popChartPigs.keepLast(MAX_POINTS);
     }
     // pas de spawn, pas de mouvement
   }

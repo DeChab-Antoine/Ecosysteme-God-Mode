@@ -90,21 +90,6 @@ export function createRenderer(canvas, { gridW, gridH, cellSize }) {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
 
-  // Dessine un cercle de vision (rayon en cellules => converti en pixels)
-  function drawVisionCircle(xCell, yCell, rCells) {
-    const cx = xCell * cellSize + cellSize / 2; // centre de la cellule
-    const cy = yCell * cellSize + cellSize / 2;
-    const rPx = rCells * cellSize;
-
-    ctx.beginPath();
-    ctx.arc(cx, cy, rPx, 0, Math.PI * 2);
-
-    // Trait léger pour ne pas polluer l'écran
-    ctx.strokeStyle = "rgba(30, 143, 255, 0.14)"; // proche du bleu
-    ctx.lineWidth = 2;
-    ctx.stroke();
-  }
-
 
   // =========================
   // Fonction principale de rendu
@@ -115,12 +100,17 @@ export function createRenderer(canvas, { gridW, gridH, cellSize }) {
 
     // Carottes = pixels orange
     for (const carrot of world.carrots.values()) {
-        fillCell(carrot.x, carrot.y, "orange");
+        fillCell(carrot.x, carrot.y, "rgb(255, 119, 0)");
     }
 
     // Humains = pixels bleus
     for (const human of world.humans.values()) {
         fillCell(human.x, human.y, "rgb(215, 152, 152)");
+    }
+
+    // Cochons = pixels roses
+    for (const pig of world.pigs.values()) {
+        fillCell(pig.x, pig.y, "rgb(255, 0, 136)");
     }
 
     // Si nuit : assombrir 

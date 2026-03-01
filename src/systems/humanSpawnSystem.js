@@ -1,4 +1,4 @@
-import { cellKey } from "../world.js";
+import { cellKey } from "./worldOps.js";
 
 // Crée un humain (factory)
 export function makeHuman(world, x, y, template) {
@@ -9,6 +9,7 @@ export function makeHuman(world, x, y, template) {
     id,
     x,
     y,
+    type: "human",
 
     // Energie
     E: template.E,
@@ -37,6 +38,7 @@ function trySpawnHuman(world, x, y, createHumanTemplate) {
 
   if (world.occupiedHumans.has(key)) return false;
   if (world.occupiedCarrots.has(key)) return false;
+  if (world.occupiedPigs.has(key)) return false;
 
   const template = createHumanTemplate(world); 
   makeHuman(world, x, y, template);

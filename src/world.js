@@ -1,10 +1,5 @@
 // Le World contient UNIQUEMENT l'état (pas de logique)
 
-// Convertit (x,y) en index unique pour Set/Map
-export function cellKey(world, x, y) {
-  return y * world.gridW + x;
-}
-
 export function createWorld({ gridW, gridH, dayTicks, nightTicks, seed }) {
   return {
     gridW,
@@ -22,12 +17,15 @@ export function createWorld({ gridW, gridH, dayTicks, nightTicks, seed }) {
     // Entités
     carrots: new Map(), // key -> { x, y, valE }
     humans: new Map(),  // id -> { id, x, y, E, Emax, R }
+    pigs: new Map(),    // id -> { id, x, y, E, Emax}
 
     // Occupation (pour empêcher spawn sur case déjà prise)
     occupiedCarrots: new Set(), // key
     occupiedHumans: new Set(),  // key
+    occupiedPigs: new Set(),    // key
 
     // compteur d'ID humains
-    nextHumanId: 1
+    nextHumanId: 1,
+    nextPigId: 1
   };
 }

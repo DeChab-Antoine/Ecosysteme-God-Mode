@@ -1,5 +1,4 @@
-import { cellKey } from "../world.js";
-import { removeCarrotAt } from "./worldOps.js";
+import { removeCarrotAt, cellKey } from "./worldOps.js";
 
 /**
  * Essaie de spawn une carotte sur une case libre.
@@ -12,6 +11,7 @@ function trySpawnCarrot(world, x, y, config) {
   // Case déjà occupée
   if (world.occupiedCarrots.has(key)) return false;
   if (world.occupiedHumans.has(key)) return false;
+  if (world.occupiedPigs.has(key)) return false;
 
   // Carotte = entité avec cycle de vie (pourriture)
   world.carrots.set(key, {
@@ -61,7 +61,7 @@ export function updateCarrotSpawns(world, config) {
  * À appeler pendant le JOUR (comme l'âge des humains).
  */
 export function updateCarrotsAging(world) {
-  // ⚠️ On itère sur une copie car on supprime pendant la boucle
+  // On itère sur une copie car on supprime pendant la boucle
   for (const carrot of Array.from(world.carrots.values())) {
     carrot.age += 1;
 
