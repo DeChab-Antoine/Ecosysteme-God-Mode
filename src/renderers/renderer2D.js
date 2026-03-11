@@ -1,6 +1,6 @@
 // Cette fonction crée un moteur de rendu pour une grille 2D
 // Elle s’occupe uniquement d’affichage (pas de logique de jeu)
-export function createRenderer(canvas, { gridW, gridH, cellSize }) {
+export function createRenderer2D(canvas, { gridW, gridH, cellSize }) {
 
   // On récupère le contexte 2D du canvas
   const ctx = canvas.getContext("2d");

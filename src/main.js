@@ -1,82 +1,56 @@
-// src/main.js
 import { createWorld } from "./world.js";
 import { mulberry32 } from "./rng.js";
-import { createRenderer } from "./renderer.js";
+import { createRenderer } from "./renderers/createRenderer.js";
+import { createViewState } from "./viewState.js";
 import { updateCarrotSpawns, updateCarrotsAging } from "./systems/carrotSystem.js";
 import { spawnInitialHumans } from "./systems/humanSpawnSystem.js";
 import { spawnInitialPigs, updatePigDay } from "./systems/pigSystem.js";
-import { updateHumanDay} from "./systems/humanSystem.js";
+import { updateHumanDay } from "./systems/humanSystem.js";
 import { createPopulationHumansChart, createPopulationPigsChart } from "./ui/populationChart.js";
 import { cellKey } from "./systems/worldOps.js";
-
 
 const canvas = document.getElementById("game");
 const statsSummaryEl = document.getElementById("statsSummary");
 
-// Paramètres du monde
+// =========================
+// Etat de vue + config centralisée
+// =========================
+const viewState = createViewState();
+
+// =========================
+// Création du monde
+// =========================
 const world = createWorld({
-  gridW: 120,
-  gridH: 80,
-  dayTicks: 100,
-  nightTicks: 1,
-  seed: crypto.getRandomValues(new Uint32Array(1))[0] // seed aléatoire
+  gridW: viewState.config.world.gridW,
+  gridH: viewState.config.world.gridH,
+  dayTicks: viewState.config.world.dayTicks,
+  nightTicks: viewState.config.world.nightTicks,
+  seed: crypto.getRandomValues(new Uint32Array(1))[0], // seed aléatoire
 });
+
 world.rand = mulberry32(world.seed);
 
-const renderer = createRenderer(canvas, {
-  gridW: world.gridW,
-  gridH: world.gridH,
-  cellSize: 8
-});
+// =========================
+// Création du renderer actif
+// =========================
+const renderer = createRenderer(canvas, world, viewState);
 
-// Paramètres carottes 
-const carrotConfig = {
-  maxCarrots: 60,
-  spawnAttemptsPerTick: 5,
-  spawnChance: 1,
-  valE: 5,
-  maxAge: 500,
-};
+// =========================
+// Spawn initial
+// =========================
+spawnInitialHumans(world, viewState.config.initialHumans);
+spawnInitialPigs(world, viewState.config.initialPigs);
 
+// =========================
+// Timing
+// =========================
+const TICK_MS = viewState.config.timing.tickMs;
+const SAMPLE_EVERY = viewState.config.timing.sampleEvery;
+const MAX_POINTS = viewState.config.timing.maxPoints;
 
-// Paramètres Spawn initial des humains
-spawnInitialHumans(world, {
-  count: 10,
-  maxAttempts: 5000,
-
-  createHumanTemplate: (world) => {
-    return {
-      E: 100,
-      Emax: 200,
-      energyDecayPerTick: 0.03,
-      R: 8,
-      lifespan: 10000,
-      duplicationCost: 150,
-      duplicationTickDelay: 1000,
-      duplicationTick: 0
-    };
-  }
-});
-
-
-// Paramètres Spawn initial des cochons
-spawnInitialPigs(world, {
-  count: 30,
-  maxAttempts: 5000,
-      
-  createPigTemplate: (world) => {
-    return {
-      Emax: 10,
-      lifespan: 1000,
-      valE: 50,
-    }
-  }
-});
-
-const TICK_MS = 1;
-
-
-// les stats
+// =========================
+// UI stats
+// =========================
 function updateStatsUI(world, phase) {
   const humanCount = world.humans.size;
 
@@ -88,7 +62,6 @@ function updateStatsUI(world, phase) {
   let avgEnergyDecayPerTick = 0;
 
   if (humanCount > 0) {
-
     for (const h of world.humans.values()) {
       avgE += h.E;
       avgEmax += h.Emax;
@@ -106,7 +79,6 @@ function updateStatsUI(world, phase) {
     avgEnergyDecayPerTick /= humanCount;
   }
 
-  // Liste des stats
   const linesStats = [];
   linesStats.push(`Seed=${world.seed}`);
   linesStats.push(`day=${world.day}`);
@@ -123,7 +95,9 @@ function updateStatsUI(world, phase) {
   statsSummaryEl.textContent = linesStats.join("\n");
 }
 
-// Jour ou Nuit 
+// =========================
+// Jour / Nuit
+// =========================
 function getPhase(world) {
   const cycle = world.dayTicks + world.nightTicks;
   const t = world.tick % cycle;
@@ -135,22 +109,23 @@ function getPhase(world) {
   }
 }
 
-
-// le graphe nb humain et cochon dans le temps 
+// =========================
+// Graphes
+// =========================
 const popChartHumans = createPopulationHumansChart();
 const popChartPigs = createPopulationPigsChart();
 
-const SAMPLE_EVERY = 1;   // un point tout les jours
-const MAX_POINTS = 3000;    
-
+// =========================
+// Boucle principale
+// =========================
 setInterval(() => {
   const phase = getPhase(world);
+  viewState.isNight = phase.name === "NIGHT";
 
   if (phase.name === "DAY") {
-    // JOUR : tout avance
-    updateCarrotSpawns(world, carrotConfig);
+    updateCarrotSpawns(world, viewState.config.carrots);
     updateCarrotsAging(world);
-    
+
     for (const human of world.humans.values()) {
       updateHumanDay(world, human);
     }
@@ -158,12 +133,8 @@ setInterval(() => {
     for (const pig of world.pigs.values()) {
       updatePigDay(world, pig);
     }
-
   } else {
-    // NUIT : tout se fige
-    // On fait le nettoyage une seule fois au début de la nuit
     if (phase.tInPhase === 0) {
-
       // Supprimer les humains morts
       for (const [id, human] of world.humans.entries()) {
         if (human.E <= 0) {
@@ -171,28 +142,23 @@ setInterval(() => {
           const key = cellKey(world, human.x, human.y);
           world.occupiedHumans.delete(key);
           world.humans.delete(id);
-
-        } 
+        }
       }
 
       world.day++;
-      popChartHumans.pushPoint(world.day, world.humans.size);
-      popChartHumans.keepLast(MAX_POINTS);
-      popChartPigs.pushPoint(world.day, world.pigs.size);
-      popChartPigs.keepLast(MAX_POINTS);
+
+      if (world.day % SAMPLE_EVERY === 0) {
+        popChartHumans.pushPoint(world.day, world.humans.size);
+        popChartHumans.keepLast(MAX_POINTS);
+
+        popChartPigs.pushPoint(world.day, world.pigs.size);
+        popChartPigs.keepLast(MAX_POINTS);
+      }
     }
-    // pas de spawn, pas de mouvement
   }
 
-  // UI
   updateStatsUI(world, phase);
-
-  // Rendu (overlay nuit)
-  renderer.renderWorld(world, {
-    isNight: phase.name === "NIGHT",
-  });
+  renderer.renderWorld(world, viewState);
 
   world.tick++;
 }, TICK_MS);
-
-

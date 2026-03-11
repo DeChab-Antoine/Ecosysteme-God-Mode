@@ -162,7 +162,15 @@ export function updateHumanDay(world, human) {
   // comportement
   let target = findNearestInVision(world, human);
 
-  if (target && (human.E < human.Emax - 50) && human.duplicationTick >= human.duplicationTickDelay) {
+  // manger que si besoin de survivre, sinon priorité à la reproduction
+  // if (target && (human.E < human.Emax - 50) && human.duplicationTick >= human.duplicationTickDelay) {
+  //   stepTowards(world, human, target.x, target.y);
+  // } else {
+  //   randomStep(world, human);
+  // }
+
+  // manger même si pas envie de se reproduire (priorité à la survie)
+  if (target) {
     stepTowards(world, human, target.x, target.y);
   } else {
     randomStep(world, human);

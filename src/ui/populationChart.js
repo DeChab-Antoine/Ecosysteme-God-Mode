@@ -7,7 +7,7 @@ export function createPopulationHumansChart() {
       label: "Humains",
       data: [],
       tension: 0.25,
-      borderColor: "rgb(215, 152, 152)",       // bleu
+      borderColor: "rgb(215, 152, 152)",      
       backgroundColor: "rgba(215, 152, 152, 0.32)",
       pointRadius: 0,
       borderWidth: 2,
@@ -62,7 +62,7 @@ export function createPopulationPigsChart() {
       label: "Cochons",
       data: [],
       tension: 0.25,
-      borderColor: "rgb(255, 0, 136)",       // orange
+      borderColor: "rgb(255, 0, 136)",      
       backgroundColor: "rgba(255, 0, 136, 0.25)",
       pointRadius: 0,
       borderWidth: 2,
