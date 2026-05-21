@@ -15,17 +15,17 @@ export function createWorld({ gridW, gridH, dayTicks, nightTicks, seed }) {
     rand: null, // sera injecté dans main
 
     // Entités
-    carrots: new Map(), // key -> { x, y, valE }
-    humans: new Map(),  // id -> { id, x, y, E, Emax, R }
-    pigs: new Map(),    // id -> { id, x, y, E, Emax}
+    plants: new Map(), // plants nutritives, key -> { x, y, valE }
+    aliens: new Map(), // aliens, id -> { id, x, y, E, Emax, R }
+    blobs: new Map(), // blobs, id -> { id, x, y, E, Emax}
 
     // Occupation (pour empêcher spawn sur case déjà prise)
-    occupiedCarrots: new Set(), // key
-    occupiedHumans: new Set(),  // key
-    occupiedPigs: new Set(),    // key
+    occupiedPlants: new Set(), // key
+    occupiedAliens: new Set(),  // key
+    occupiedBlobs: new Set(),    // key
 
-    // compteur d'ID humains
-    nextHumanId: 1,
-    nextPigId: 1
+    // Compteurs d'ID des entites autonomes.
+    nextAlienId: 1,
+    nextBlobId: 1
   };
 }

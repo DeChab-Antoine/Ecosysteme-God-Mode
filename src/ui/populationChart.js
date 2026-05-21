@@ -1,10 +1,10 @@
-export function createPopulationHumansChart() {
-  const ctx = document.getElementById("popChartHumans");
+export function createPopulationAliensChart() {
+  const ctx = document.getElementById("popChartAliens");
 
-  const dataHumans = {
+  const dataAliens = {
     labels: [],
     datasets: [{
-      label: "Humains",
+      label: "Aliens",
       data: [],
       tension: 0.25,
       borderColor: "rgb(215, 152, 152)",      
@@ -15,9 +15,9 @@ export function createPopulationHumansChart() {
     }]
   };
 
-  const chartHumans = new Chart(ctx, {
+  const chartAliens = new Chart(ctx, {
     type: "line",
-    data: dataHumans,
+    data: dataAliens,
     options: {
       responsive: true,
       animation: false,
@@ -25,7 +25,7 @@ export function createPopulationHumansChart() {
         legend: { display: false },
         title: {
           display: true,
-          text: "Humans",
+          text: "Aliens",
           padding: { top: 6, bottom: 6 }
         }
       },
@@ -38,28 +38,28 @@ export function createPopulationHumansChart() {
 
   return {
     pushPoint(t, pop) {
-      dataHumans.labels.push(t);
-      dataHumans.datasets[0].data.push(pop);
-      chartHumans.update("none");
+      dataAliens.labels.push(t);
+      dataAliens.datasets[0].data.push(pop);
+      chartAliens.update("none");
     },
     keepLast(maxPoints) {
-      const extra = dataHumans.labels.length - maxPoints;
+      const extra = dataAliens.labels.length - maxPoints;
       if (extra > 0) {
-        dataHumans.labels.splice(0, extra);
-        dataHumans.datasets[0].data.splice(0, extra);
+        dataAliens.labels.splice(0, extra);
+        dataAliens.datasets[0].data.splice(0, extra);
       }
     }
   };
 }
 
 
-export function createPopulationPigsChart() {
-  const ctx = document.getElementById("popChartPigs");
+export function createPopulationBlobsChart() {
+  const ctx = document.getElementById("popChartBlobs");
 
-  const dataPigs = {
+  const dataBlobs = {
     labels: [],
     datasets: [{
-      label: "Cochons",
+      label: "Blobs",
       data: [],
       tension: 0.25,
       borderColor: "rgb(255, 0, 136)",      
@@ -70,9 +70,9 @@ export function createPopulationPigsChart() {
     }]
   };
 
-  const chartPigs = new Chart(ctx, {
+  const chartBlobs = new Chart(ctx, {
     type: "line",
-    data: dataPigs,
+    data: dataBlobs,
     options: {
       responsive: true,
       animation: false,
@@ -80,7 +80,7 @@ export function createPopulationPigsChart() {
         legend: { display: false },
         title: {
           display: true,
-          text: "Pigs",
+          text: "Blobs",
           padding: { top: 6, bottom: 6 }
         }
       },
@@ -93,15 +93,15 @@ export function createPopulationPigsChart() {
 
   return {
     pushPoint(t, pop) {
-      dataPigs.labels.push(t);
-      dataPigs.datasets[0].data.push(pop);
-      chartPigs.update("none");
+      dataBlobs.labels.push(t);
+      dataBlobs.datasets[0].data.push(pop);
+      chartBlobs.update("none");
     },
     keepLast(maxPoints) {
-      const extra = dataPigs.labels.length - maxPoints;
+      const extra = dataBlobs.labels.length - maxPoints;
       if (extra > 0) {
-        dataPigs.labels.splice(0, extra);
-        dataPigs.datasets[0].data.splice(0, extra);
+        dataBlobs.labels.splice(0, extra);
+        dataBlobs.datasets[0].data.splice(0, extra);
       }
     }
   };

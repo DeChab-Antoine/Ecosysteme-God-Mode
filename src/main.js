@@ -2,11 +2,11 @@ import { createWorld } from "./world.js";
 import { mulberry32 } from "./rng.js";
 import { createRenderer } from "./renderers/createRenderer.js";
 import { createViewState } from "./viewState.js";
-import { updateCarrotSpawns, updateCarrotsAging } from "./systems/carrotSystem.js";
-import { spawnInitialHumans } from "./systems/humanSpawnSystem.js";
-import { spawnInitialPigs, updatePigDay } from "./systems/pigSystem.js";
-import { updateHumanDay } from "./systems/humanSystem.js";
-import { createPopulationHumansChart, createPopulationPigsChart } from "./ui/populationChart.js";
+import { updatePlantSpawns, updatePlantsAging } from "./systems/plantSystem.js";
+import { spawnInitialAliens } from "./systems/alienSpawnSystem.js";
+import { spawnInitialBlobs, updateBlobDay } from "./systems/blobSystem.js";
+import { updateAlienDay } from "./systems/alienSystem.js";
+import { createPopulationAliensChart, createPopulationBlobsChart } from "./ui/populationChart.js";
 import { cellKey } from "./systems/worldOps.js";
 
 const canvas = document.getElementById("game");
@@ -16,6 +16,7 @@ const statsSummaryEl = document.getElementById("statsSummary");
 // Etat de vue + config centralisée
 // =========================
 const viewState = createViewState();
+const labels = viewState.config.labels;
 
 // =========================
 // Création du monde
@@ -38,8 +39,8 @@ const renderer = createRenderer(canvas, world, viewState);
 // =========================
 // Spawn initial
 // =========================
-spawnInitialHumans(world, viewState.config.initialHumans);
-spawnInitialPigs(world, viewState.config.initialPigs);
+spawnInitialAliens(world, viewState.config.initialAliens);
+spawnInitialBlobs(world, viewState.config.initialBlobs);
 
 // =========================
 // Timing
@@ -52,7 +53,7 @@ const MAX_POINTS = viewState.config.timing.maxPoints;
 // UI stats
 // =========================
 function updateStatsUI(world, phase) {
-  const humanCount = world.humans.size;
+  const alienCount = world.aliens.size;
 
   let avgE = 0;
   let avgEmax = 0;
@@ -61,8 +62,8 @@ function updateStatsUI(world, phase) {
   let avgR = 0;
   let avgEnergyDecayPerTick = 0;
 
-  if (humanCount > 0) {
-    for (const h of world.humans.values()) {
+  if (alienCount > 0) {
+    for (const h of world.aliens.values()) {
       avgE += h.E;
       avgEmax += h.Emax;
       avgAge += h.age;
@@ -71,21 +72,21 @@ function updateStatsUI(world, phase) {
       avgEnergyDecayPerTick += h.energyDecayPerTick;
     }
 
-    avgE /= humanCount;
-    avgEmax /= humanCount;
-    avgAge /= humanCount;
-    avgLifespan /= humanCount;
-    avgR /= humanCount;
-    avgEnergyDecayPerTick /= humanCount;
+    avgE /= alienCount;
+    avgEmax /= alienCount;
+    avgAge /= alienCount;
+    avgLifespan /= alienCount;
+    avgR /= alienCount;
+    avgEnergyDecayPerTick /= alienCount;
   }
 
   const linesStats = [];
   linesStats.push(`Seed=${world.seed}`);
   linesStats.push(`day=${world.day}`);
   linesStats.push(`phase=${phase.name} (t=${phase.tInPhase}/${phase.duration})`);
-  linesStats.push(`humans=${world.humans.size}`);
-  linesStats.push(`pigs=${world.pigs.size}`);
-  linesStats.push(`carrots=${world.carrots.size}`);
+  linesStats.push(`${labels.aliens}=${world.aliens.size}`);
+  linesStats.push(`${labels.blobs}=${world.blobs.size}`);
+  linesStats.push(`${labels.plants}=${world.plants.size}`);
 
   linesStats.push(`avgE=${avgE.toFixed(1)} / ${avgEmax.toFixed(1)}`);
   linesStats.push(`avgAge=${avgAge.toFixed(1)} / ${avgLifespan.toFixed(1)}`);
@@ -112,8 +113,8 @@ function getPhase(world) {
 // =========================
 // Graphes
 // =========================
-const popChartHumans = createPopulationHumansChart();
-const popChartPigs = createPopulationPigsChart();
+const popChartAliens = createPopulationAliensChart();
+const popChartBlobs = createPopulationBlobsChart();
 
 // =========================
 // Boucle principale
@@ -123,36 +124,36 @@ setInterval(() => {
   viewState.isNight = phase.name === "NIGHT";
 
   if (phase.name === "DAY") {
-    updateCarrotSpawns(world, viewState.config.carrots);
-    updateCarrotsAging(world);
+    updatePlantSpawns(world, viewState.config.plants);
+    updatePlantsAging(world);
 
-    for (const human of world.humans.values()) {
-      updateHumanDay(world, human);
+    for (const alien of world.aliens.values()) {
+      updateAlienDay(world, alien);
     }
 
-    for (const pig of world.pigs.values()) {
-      updatePigDay(world, pig);
+    for (const blob of world.blobs.values()) {
+      updateBlobDay(world, blob);
     }
   } else {
     if (phase.tInPhase === 0) {
-      // Supprimer les humains morts
-      for (const [id, human] of world.humans.entries()) {
-        if (human.E <= 0) {
-          console.log(`Humain#${human.id} a disparu`);
-          const key = cellKey(world, human.x, human.y);
-          world.occupiedHumans.delete(key);
-          world.humans.delete(id);
+      // Supprimer les agents sans energie
+      for (const [id, alien] of world.aliens.entries()) {
+        if (alien.E <= 0) {
+          console.log(`alien#${alien.id} a disparu`);
+          const key = cellKey(world, alien.x, alien.y);
+          world.occupiedAliens.delete(key);
+          world.aliens.delete(id);
         }
       }
 
       world.day++;
 
       if (world.day % SAMPLE_EVERY === 0) {
-        popChartHumans.pushPoint(world.day, world.humans.size);
-        popChartHumans.keepLast(MAX_POINTS);
+        popChartAliens.pushPoint(world.day, world.aliens.size);
+        popChartAliens.keepLast(MAX_POINTS);
 
-        popChartPigs.pushPoint(world.day, world.pigs.size);
-        popChartPigs.keepLast(MAX_POINTS);
+        popChartBlobs.pushPoint(world.day, world.blobs.size);
+        popChartBlobs.keepLast(MAX_POINTS);
       }
     }
   }

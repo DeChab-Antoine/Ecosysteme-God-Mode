@@ -98,19 +98,19 @@ export function createRenderer2D(canvas, { gridW, gridH, cellSize }) {
     clear();
     drawGrid();
 
-    // Carottes = pixels orange
-    for (const carrot of world.carrots.values()) {
-        fillCell(carrot.x, carrot.y, "rgb(255, 119, 0)");
+    // Plants nutritifs = pixels orange
+    for (const plant of world.plants.values()) {
+        fillCell(plant.x, plant.y, "rgb(255, 119, 0)");
     }
 
-    // Humains = pixels bleus
-    for (const human of world.humans.values()) {
-        fillCell(human.x, human.y, "rgb(215, 152, 152)");
+    // Aliens = pixels pales
+    for (const alien of world.aliens.values()) {
+        fillCell(alien.x, alien.y, "rgb(215, 152, 152)");
     }
 
-    // Cochons = pixels roses
-    for (const pig of world.pigs.values()) {
-        fillCell(pig.x, pig.y, "rgb(255, 0, 136)");
+    // Blobs = pixels roses
+    for (const blob of world.blobs.values()) {
+        fillCell(blob.x, blob.y, "rgb(255, 0, 136)");
     }
 
     // Si nuit : assombrir 

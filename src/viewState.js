@@ -31,19 +31,19 @@ export function createViewState() {
         maxPoints: 3000,
       },
 
-      carrots: {
-        maxCarrots: 60,
+      plants: {
+        maxPlants: 60,
         spawnAttemptsPerTick: 5,
         spawnChance: 1,
         valE: 5,
         maxAge: 500,
       },
 
-      initialHumans: {
+      initialAliens: {
         count: 10,
         maxAttempts: 5000,
 
-        createHumanTemplate: (world) => {
+        createAlienTemplate: (world) => {
           return {
             E: 100,
             Emax: 200,
@@ -57,11 +57,11 @@ export function createViewState() {
         },
       },
 
-      initialPigs: {
+      initialBlobs: {
         count: 16,
         maxAttempts: 5000,
 
-        createPigTemplate: (world) => {
+        createBlobTemplate: (world) => {
           return {
             Emax: 20,
             lifespan: 1400,
@@ -71,6 +71,12 @@ export function createViewState() {
             duplicationTick: 0,
           };
         },
+      },
+
+      labels: {
+        aliens: "Aliens",
+        blobs: "Blobs",
+        plants: "Plants",
       },
     },
   };

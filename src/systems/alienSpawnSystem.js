@@ -1,15 +1,15 @@
 import { cellKey } from "./worldOps.js";
 
-// Crée un humain (factory)
-export function makeHuman(world, x, y, template) {
-  const id = world.nextHumanId++;
+// Cree une alien autonome. Le type interne "alien" reste pour compatibilite.
+export function makeAlien(world, x, y, template) {
+  const id = world.nextAlienId++;
 
   // On clone le template et on ajoute l'id + position
-  const human = {
+  const alien = {
     id,
     x,
     y,
-    type: "human",
+    type: "alien",
 
     // Energie
     E: template.E,
@@ -29,25 +29,25 @@ export function makeHuman(world, x, y, template) {
     duplicationTickDelay: template.duplicationTickDelay
   };
 
-  world.humans.set(id, human);
+  world.aliens.set(id, alien);
 }
 
-// Essaie de placer un humain sur une case libre 
-function trySpawnHuman(world, x, y, createHumanTemplate) {
+// Essaie de placer une alien sur une case libre.
+function trySpawnAlien(world, x, y, createAlienTemplate) {
   const key = cellKey(world, x, y);
 
-  if (world.occupiedHumans.has(key)) return false;
-  if (world.occupiedCarrots.has(key)) return false;
-  if (world.occupiedPigs.has(key)) return false;
+  if (world.occupiedAliens.has(key)) return false;
+  if (world.occupiedPlants.has(key)) return false;
+  if (world.occupiedBlobs.has(key)) return false;
 
-  const template = createHumanTemplate(world); 
-  makeHuman(world, x, y, template);
-  world.occupiedHumans.add(key);
+  const template = createAlienTemplate(world); 
+  makeAlien(world, x, y, template);
+  world.occupiedAliens.add(key);
   return true;
 }
 
-export function spawnInitialHumans(world, config) {
-  const { count, maxAttempts, createHumanTemplate } = config;
+export function spawnInitialAliens(world, config) {
+  const { count, maxAttempts, createAlienTemplate } = config;
 
   let spawned = 0;
   let attempts = 0;
@@ -58,7 +58,7 @@ export function spawnInitialHumans(world, config) {
     const x = Math.floor(world.rand() * world.gridW);
     const y = Math.floor(world.rand() * world.gridH);
 
-    const ok = trySpawnHuman(world, x, y, createHumanTemplate);
+    const ok = trySpawnAlien(world, x, y, createAlienTemplate);
     if (ok) spawned++;
   }
 }
