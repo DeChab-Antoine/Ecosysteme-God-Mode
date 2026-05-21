@@ -23,6 +23,8 @@ export function makePig(world, x, y, template) {
 
     // Duplication
     duplicationCost: template.duplicationCost ?? Math.ceil(template.Emax * 0.5),
+    duplicationTick: template.duplicationTick ?? 0,
+    duplicationTickDelay: template.duplicationTickDelay ?? 250,
   };
 
   world.pigs.set(id, pig);
@@ -112,6 +114,7 @@ function canDuplicate(pig) {
   return (
     Number.isFinite(pig.E) &&
     Number.isFinite(pig.Emax) &&
+    pig.duplicationTick >= pig.duplicationTickDelay &&
     pig.E >= (pig.Emax * 0.95)
   );
 }
@@ -128,12 +131,15 @@ export function tryDuplicate(world, parent) {
     age: 0,
     lifespan: parent.lifespan,
     duplicationCost,
+    duplicationTick: 0,
+    duplicationTickDelay: parent.duplicationTickDelay,
   };
 
   makePig(world, spot.x, spot.y, childTemplate);
   world.occupiedPigs.add(cellKey(world, spot.x, spot.y));
 
   parent.E = clamp(parent.E - duplicationCost, 0, parent.Emax);
+  parent.duplicationTick = 0;
 
   return true;
 }
@@ -147,6 +153,7 @@ export function updatePigDay(world, pig) {
   }
 
   pig.age++;
+  pig.duplicationTick++;
 
   const target = findNearestCarrot(world, pig);
 

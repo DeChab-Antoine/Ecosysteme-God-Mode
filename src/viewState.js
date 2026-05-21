@@ -58,15 +58,17 @@ export function createViewState() {
       },
 
       initialPigs: {
-        count: 30,
+        count: 16,
         maxAttempts: 5000,
 
         createPigTemplate: (world) => {
           return {
-            Emax: 10,
-            lifespan: 1000,
+            Emax: 20,
+            lifespan: 1400,
             valE: 50,
-            duplicationCost: 5,
+            duplicationCost: 16,
+            duplicationTickDelay: 350,
+            duplicationTick: 0,
           };
         },
       },
