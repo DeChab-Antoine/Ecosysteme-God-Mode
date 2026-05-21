@@ -1,10 +1,9 @@
 import { cellKey, dist2, clamp, moveTo, findFreeNeighborCell, removeCarrotAt, removePigAt } from "./worldOps.js";
 
-// Crée un cochon (factory)
+// Cree un cochon (factory)
 export function makePig(world, x, y, template) {
   const id = world.nextPigId++;
 
-  // On clone le template et on ajoute l'id + position
   const pig = {
     id,
     x,
@@ -12,21 +11,24 @@ export function makePig(world, x, y, template) {
     type: "pig",
 
     // Energie
-    E: 0,
+    E: template.E ?? 0,
     Emax: template.Emax,
 
-    // Energie pour humain
+    // Energie recuperee par un humain qui mange le cochon
     valE: template.valE,
 
     // Age
-    age: 0,
+    age: template.age ?? 0,
     lifespan: template.lifespan,
+
+    // Duplication
+    duplicationCost: template.duplicationCost ?? Math.ceil(template.Emax * 0.5),
   };
 
   world.pigs.set(id, pig);
 }
 
-// Essaie de placer un cochon sur une case libre 
+// Essaie de placer un cochon sur une case libre
 function trySpawnPig(world, x, y, createPigTemplate) {
   const key = cellKey(world, x, y);
 
@@ -34,12 +36,11 @@ function trySpawnPig(world, x, y, createPigTemplate) {
   if (world.occupiedCarrots.has(key)) return false;
   if (world.occupiedPigs.has(key)) return false;
 
-  const template = createPigTemplate(world); 
+  const template = createPigTemplate(world);
   makePig(world, x, y, template);
   world.occupiedPigs.add(key);
   return true;
 }
-
 
 export function spawnInitialPigs(world, config) {
   const { count, maxAttempts, createPigTemplate } = config;
@@ -58,13 +59,11 @@ export function spawnInitialPigs(world, config) {
   }
 }
 
-
 // Cherche la carotte la plus proche
 function findNearestCarrot(world, pig) {
   let best = null;
   let bestD2 = Infinity;
 
-  // Simple (bruteforce) : 
   for (const c of world.carrots.values()) {
     const d2 = dist2(pig.x, pig.y, c.x, c.y);
     if (d2 < bestD2) {
@@ -72,37 +71,32 @@ function findNearestCarrot(world, pig) {
       best = c;
     }
   }
-  return best; // soit {x,y,valE} soit null
-}
 
+  return best;
+}
 
 // Mouvement d'un pas vers une cible (x,y)
 function stepTowards(world, pig, tx, ty) {
   const dx = tx - pig.x;
   const dy = ty - pig.y;
 
-  // 1) direction principale (axe dominant)
   const primary = (Math.abs(dx) >= Math.abs(dy))
     ? { x: pig.x + Math.sign(dx), y: pig.y }
     : { x: pig.x, y: pig.y + Math.sign(dy) };
 
   if (moveTo(world, pig, primary.x, primary.y)) return;
 
-  // 2) direction secondaire (l'autre axe)
   const secondary = (Math.abs(dx) >= Math.abs(dy))
     ? { x: pig.x, y: pig.y + Math.sign(dy) }
     : { x: pig.x + Math.sign(dx), y: pig.y };
 
   if (moveTo(world, pig, secondary.x, secondary.y)) return;
 
-  // 3) sinon: petit déplacement aléatoire pour se dégager
   randomStep(world, pig);
 }
 
-
-// Mouvement random 
 function randomStep(world, pig) {
-  const r = Math.floor(world.rand() * 4); // 0..3
+  const r = Math.floor(world.rand() * 4);
   let nx = pig.x;
   let ny = pig.y;
 
@@ -114,60 +108,47 @@ function randomStep(world, pig) {
   moveTo(world, pig, nx, ny);
 }
 
-
 function canDuplicate(pig) {
   return (
-    // Assez d'énergie pour se dupliquer
+    Number.isFinite(pig.E) &&
+    Number.isFinite(pig.Emax) &&
     pig.E >= (pig.Emax * 0.95)
   );
 }
 
-
-// crée le bébé
 export function tryDuplicate(world, parent) {
   const spot = findFreeNeighborCell(world, parent.x, parent.y);
   if (!spot) return false;
 
-  // Crée un adulte
+  const duplicationCost = parent.duplicationCost ?? Math.ceil(parent.Emax * 0.5);
   const childTemplate = {
-        // Energie
-        E: parent.E,
-        Emax: parent.Emax,
+    E: duplicationCost,
+    Emax: parent.Emax,
+    valE: parent.valE,
+    age: 0,
+    lifespan: parent.lifespan,
+    duplicationCost,
+  };
 
-        // Energie pour humain
-        valE: parent.valE,
-
-        // Age
-        age: 0,
-        lifespan: parent.lifespan,
-    };
   makePig(world, spot.x, spot.y, childTemplate);
-
-  // Ajout au world
   world.occupiedPigs.add(cellKey(world, spot.x, spot.y));
 
-  // Coût énergie + reset cooldown parent
-  parent.E -= parent.duplicationCost;
-
-  parent.duplicationTick = 0;
+  parent.E = clamp(parent.E - duplicationCost, 0, parent.Emax);
 
   return true;
 }
 
 // Un tick "JOUR" pour 1 cochon
 export function updatePigDay(world, pig) {
-  // si trop vieux supprimer energie 
   if (pig.age >= pig.lifespan) {
-    console.log(`Cochon#${pig.id} est mort de vielliesse`);
+    console.log(`Cochon#${pig.id} est mort de vieillesse`);
     removePigAt(world, pig);
-    return; 
+    return;
   }
 
-  // age augmente 
   pig.age++;
 
-  // comportement
-  let target = findNearestCarrot(world, pig);
+  const target = findNearestCarrot(world, pig);
 
   if (target) {
     stepTowards(world, pig, target.x, target.y);
@@ -179,11 +160,8 @@ export function updatePigDay(world, pig) {
     tryDuplicate(world, pig);
   }
 
-
-  // si sur carotte => manger
   const key = cellKey(world, pig.x, pig.y);
   if (world.occupiedCarrots.has(key)) {
-    // récup valE avant suppression
     const carrot = world.carrots.get(key);
     if (carrot) {
       removeCarrotAt(world, pig.x, pig.y);
@@ -192,4 +170,3 @@ export function updatePigDay(world, pig) {
     }
   }
 }
-

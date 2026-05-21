@@ -106,7 +106,11 @@ export function findFreeNeighborCell(world, x, y) {
     if (ny < 0 || ny >= world.gridH) continue;
 
     const k = cellKey(world, nx, ny);
-    if (!world.occupiedHumans.has(k)) {
+    if (
+      !world.occupiedHumans.has(k) &&
+      !world.occupiedPigs.has(k) &&
+      !world.occupiedCarrots.has(k)
+    ) {
       return { x: nx, y: ny };
     }
   }

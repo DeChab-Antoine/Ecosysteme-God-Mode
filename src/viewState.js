@@ -66,6 +66,7 @@ export function createViewState() {
             Emax: 10,
             lifespan: 1000,
             valE: 50,
+            duplicationCost: 5,
           };
         },
       },

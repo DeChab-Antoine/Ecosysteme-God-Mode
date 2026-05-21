@@ -1,4 +1,4 @@
-import { moveTo, removeCarrotAt, removePigAt, cellKey, dist2, clamp, findFreeNeighborCell, isAdjacentOrSame} from "./worldOps.js";
+import { moveTo, removeCarrotAt, removePigAt, cellKey, dist2, clamp, findFreeNeighborCell } from "./worldOps.js";
 import { makeHuman } from "./humanSpawnSystem.js";
 
 // Cherche la nourriture la plus proche dans le rayon R
@@ -33,6 +33,8 @@ function findNearestInVision(world, human) {
 
 function canDuplicate(human) {
   return (
+    Number.isFinite(human.E) &&
+    Number.isFinite(human.Emax) &&
     // A envie de se dupliquer 
     human.duplicationTick >= human.duplicationTickDelay &&
     // Assez d'énergie pour se dupliquer
@@ -41,17 +43,17 @@ function canDuplicate(human) {
 }
 
 
-function mutate(a) {
-    const factor = 0.8 + Math.random() * 0.4; 
+function mutate(world, a) {
+    const factor = 0.8 + world.rand() * 0.4;
     return a * factor;
 }
 
 
 // Crée le template bébé
-function createChildTemplate(parent) {
-    const Emax = mutate(parent.Emax);
-    const r = mutate(parent.R);
-    const lifespan = mutate(parent.lifespan);
+function createChildTemplate(world, parent) {
+    const Emax = mutate(world, parent.Emax);
+    const r = mutate(world, parent.R);
+    const lifespan = mutate(world, parent.lifespan);
 
 
 
@@ -82,14 +84,14 @@ export function tryDuplicate(world, parent) {
   if (!spot) return false;
 
   // Crée un adulte
-  const childTemplate = createChildTemplate(parent);
+  const childTemplate = createChildTemplate(world, parent);
   makeHuman(world, spot.x, spot.y, childTemplate);
 
   // Ajout au world
   world.occupiedHumans.add(cellKey(world, spot.x, spot.y));
 
   // Coût énergie + reset cooldown parent
-  parent.E -= parent.duplicationCost;
+  parent.E = clamp(parent.E - parent.duplicationCost, 0, parent.Emax);
 
   parent.duplicationTick = 0;
 
