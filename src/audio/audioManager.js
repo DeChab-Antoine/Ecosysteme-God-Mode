@@ -1,4 +1,4 @@
-const AUDIO_ROOT = "./assets/audio/";
+const AUDIO_ROOT = new URL("../../assets/audio/", import.meta.url).href;
 
 const MUSIC_TRACKS = [
   "1 - Astro Reverie (Loop).ogg",

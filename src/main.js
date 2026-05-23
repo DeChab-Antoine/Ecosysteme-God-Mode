@@ -117,7 +117,7 @@ const ACHIEVEMENTS = [
     id: "first_mutation",
     name: "Première mutation",
     desc: "⚗ Un alien absorbe une plante rage",
-    reward: 0,
+    reward: 10,
     isDone: () => hadMutation,
     progress: () => hadMutation ? "✓" : "0/1",
   },

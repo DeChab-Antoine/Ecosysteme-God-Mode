@@ -4,7 +4,7 @@
 export const DEATH_ANIMATION_MS = 1800;
 export const CORPSE_REMAIN_MS   = 2200;
 
-const ASSET_ROOT_URL = "./assets/";
+const ASSET_ROOT_URL = new URL("../../assets/", import.meta.url).href;
 
 export function createAssetLoader(scene, shadowGenerator) {
   const assetContainerPromises = new Map();
