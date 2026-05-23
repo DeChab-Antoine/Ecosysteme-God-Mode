@@ -83,8 +83,8 @@ export function createScene(canvas, gridW, gridH) {
   scene.clearColor  = new BABYLON.Color4(0.06, 0.07, 0.1, 1);
   scene.ambientColor = new BABYLON.Color3(0.15, 0.18, 0.25);
   scene.fogMode    = BABYLON.Scene.FOGMODE_EXP2;
-  scene.fogDensity = 0.0028;
-  scene.fogColor   = new BABYLON.Color3(0.06, 0.07, 0.1);
+  scene.fogDensity = 0.0018;
+  scene.fogColor   = new BABYLON.Color3(0.12, 0.13, 0.18);
 
   // ----- Caméra -----
   const worldCenter  = new BABYLON.Vector3((gridW - 1) / 2, 0, (gridH - 1) / 2);
@@ -101,14 +101,14 @@ export function createScene(canvas, gridW, gridH) {
 
   // ----- Lumières -----
   const hemiLight = new BABYLON.HemisphericLight("hemiLight", new BABYLON.Vector3(0, 1, 0), scene);
-  hemiLight.intensity   = 1.1;
-  hemiLight.diffuse     = new BABYLON.Color3(0.72, 0.82, 1.0);
-  hemiLight.groundColor = new BABYLON.Color3(0.22, 0.16, 0.30);
+  hemiLight.intensity   = 1.8;
+  hemiLight.diffuse     = new BABYLON.Color3(0.95, 1.0, 1.0);
+  hemiLight.groundColor = new BABYLON.Color3(0.36, 0.28, 0.44);
 
   const dirLight = new BABYLON.DirectionalLight("dirLight", new BABYLON.Vector3(-0.5, -1, -0.5), scene);
-  dirLight.intensity = 1.5;
-  dirLight.diffuse   = new BABYLON.Color3(1.0, 0.82, 0.58);
-  dirLight.specular  = new BABYLON.Color3(0.6, 0.50, 0.38);
+  dirLight.intensity = 3.4;
+  dirLight.diffuse   = new BABYLON.Color3(1.0, 0.92, 0.72);
+  dirLight.specular  = new BABYLON.Color3(0.95, 0.82, 0.60);
 
   // Position initiale — sera écrasée chaque frame par le système solaire
   const initSunPos = new BABYLON.Vector3(-gridW * 0.16, 36, -gridH * 0.18);
@@ -117,7 +117,7 @@ export function createScene(canvas, gridW, gridH) {
 
   // ----- GlowLayer -----
   const glowLayer = new BABYLON.GlowLayer("exoplanetGlow", scene, { blurKernelSize: 48 });
-  glowLayer.intensity = 0.45;
+  glowLayer.intensity = 0.65;
 
   // ----- Ombres -----
   const shadowGenerator = new BABYLON.ShadowGenerator(1024, dirLight);
@@ -132,8 +132,8 @@ export function createScene(canvas, gridW, gridH) {
 
   const groundMat = new BABYLON.StandardMaterial("groundMat", scene);
   groundMat.diffuseColor   = BABYLON.Color3.White();
-  groundMat.emissiveColor  = new BABYLON.Color3(0.012, 0.010, 0.022);
-  groundMat.specularColor  = new BABYLON.Color3(0.06,  0.04,  0.09);
+  groundMat.emissiveColor  = new BABYLON.Color3(0.030, 0.026, 0.050);
+  groundMat.specularColor  = new BABYLON.Color3(0.12,  0.09,  0.16);
   groundMat.diffuseTexture = buildGroundTexture(scene);
   ground.material      = groundMat;
   ground.receiveShadows = true;

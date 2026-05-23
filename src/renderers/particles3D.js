@@ -1,13 +1,9 @@
 // Effets de particules pour les événements de jeu.
 // BABYLON est chargé via CDN dans index.html.
 
-let _flareTexture = null;
-
-function getFlareTexture(scene) {
-  if (_flareTexture && !_flareTexture.isDisposed()) return _flareTexture;
-
+function createFlareTexture(scene, name) {
   const SIZE = 64;
-  const tex  = new BABYLON.DynamicTexture("nukeFlare", { width: SIZE, height: SIZE }, scene, false);
+  const tex  = new BABYLON.DynamicTexture(name, { width: SIZE, height: SIZE }, scene, false);
   tex.hasAlpha = true;
 
   const ctx = tex.getContext();
@@ -20,19 +16,20 @@ function getFlareTexture(scene) {
   ctx.fillStyle = grd;
   ctx.fillRect(0, 0, SIZE, SIZE);
   tex.update();
-
-  _flareTexture = tex;
   return tex;
 }
 
 // Crée une explosion de nuke en (worldX, worldY) avec des particules feu + cendres
 // et un anneau de choc se dilatant jusqu'au rayon d'effet.
 export function createNukeExplosion(scene, worldX, worldY, radius) {
+  if (!scene || scene.isDisposed) return;
+
+  const effectId = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
   const emitterPos = new BABYLON.Vector3(worldX, 1.0, worldY);
-  const flare      = getFlareTexture(scene);
+  const flare      = createFlareTexture(scene, `nukeFlare-${effectId}`);
 
   // ----- Particules feu (burst principal) -----
-  const fire = new BABYLON.ParticleSystem("nukeFire", 600, scene);
+  const fire = new BABYLON.ParticleSystem(`nukeFire-${effectId}`, 600, scene);
   fire.particleTexture = flare;
   fire.emitter         = emitterPos.clone();
 
@@ -55,7 +52,7 @@ export function createNukeExplosion(scene, worldX, worldY, radius) {
   fire.start();
 
   // ----- Particules cendres (traînée lente) -----
-  const ash = new BABYLON.ParticleSystem("nukeAsh", 200, scene);
+  const ash = new BABYLON.ParticleSystem(`nukeAsh-${effectId}`, 200, scene);
   ash.particleTexture = flare;
   ash.emitter         = emitterPos.clone();
 
@@ -85,14 +82,17 @@ export function createNukeExplosion(scene, worldX, worldY, radius) {
 
   // Nettoyage après expiration de vie max des particules
   setTimeout(() => {
-    try { if (!fire.isDisposed()) fire.dispose(); } catch (_) {}
+    try { if (!fire.isDisposed()) fire.dispose(false); } catch (_) {}
   }, 2500);
   setTimeout(() => {
-    try { if (!ash.isDisposed()) ash.dispose(); } catch (_) {}
+    try { if (!ash.isDisposed()) ash.dispose(false); } catch (_) {}
   }, 4000);
+  setTimeout(() => {
+    try { if (!flare.isDisposed()) flare.dispose(); } catch (_) {}
+  }, 4300);
 
   // ----- Anneau de choc -----
-  const ring = BABYLON.MeshBuilder.CreateTorus("nukeRing", {
+  const ring = BABYLON.MeshBuilder.CreateTorus(`nukeRing-${effectId}`, {
     diameter: 1, thickness: 0.22, tessellation: 48,
   }, scene);
   ring.position.copyFrom(emitterPos);
@@ -100,7 +100,7 @@ export function createNukeExplosion(scene, worldX, worldY, radius) {
   ring.rotation.x  = Math.PI / 2;
   ring.isPickable  = false;
 
-  const ringMat = new BABYLON.StandardMaterial(`nukeRingMat-${Date.now()}`, scene);
+  const ringMat = new BABYLON.StandardMaterial(`nukeRingMat-${effectId}`, scene);
   ringMat.diffuseColor    = new BABYLON.Color3(1.0, 0.55, 0.10);
   ringMat.emissiveColor   = new BABYLON.Color3(1.0, 0.42, 0.06);
   ringMat.backFaceCulling = false;
@@ -114,6 +114,11 @@ export function createNukeExplosion(scene, worldX, worldY, radius) {
 
   const observer = scene.onBeforeRenderObservable.add(() => {
     if (ringDone) return;
+    if (scene.isDisposed || ring.isDisposed()) {
+      ringDone = true;
+      scene.onBeforeRenderObservable.remove(observer);
+      return;
+    }
     elapsed += scene.getEngine().getDeltaTime();
     const t      = Math.min(1, elapsed / RING_DURATION_MS);
     const eased  = 1 - (1 - t) * (1 - t); // ease-out quad

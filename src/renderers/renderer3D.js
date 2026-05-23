@@ -53,13 +53,25 @@ export function createRenderer3D(canvas, { gridW, gridH }) {
 
     // Événements Frappe : particules + suppression des décorations dans le rayon
     for (const evt of world.nukeEvents) {
-      createNukeExplosion(scene, evt.x, evt.y, evt.radius);
-      decorations.removeInRadius(evt.x, evt.y, evt.radius);
+      try {
+        createNukeExplosion(scene, evt.x, evt.y, evt.radius);
+        decorations.removeInRadius(evt.x, evt.y, evt.radius);
+      } catch (err) {
+        console.error("Erreur pendant le rendu de la frappe", err);
+      }
     }
     world.nukeEvents.length = 0;
 
+    // Événements de transformation alien → alien2
+    for (const evt of world.transformEvents) {
+      entitySync.playTransformEffect(evt.alienId, evt.x, evt.y);
+    }
+    world.transformEvents.length = 0;
+
     entitySync.syncPoisonPlants(world);
+    entitySync.syncRagePlants(world);
     entitySync.syncAliens(world);
+    entitySync.syncAlien2s(world);
     entitySync.syncBlobs(world);
   }
 

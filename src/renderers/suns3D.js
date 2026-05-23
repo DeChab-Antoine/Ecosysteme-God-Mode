@@ -8,17 +8,17 @@ const SUN_DEFS = [
     meshColor:  new BABYLON.Color3(1.0, 0.28, 0.85),
     haloColor:  new BABYLON.Color3(0.38, 0.14, 0.85),
     lightColor: new BABYLON.Color3(1.0, 0.32, 0.82),
-    maxIntensity: 3.5, contrib: 0.50, size: 14 },
+    maxIntensity: 7.5, contrib: 0.50, size: 14 },
   { clusterAngle: T3,
     meshColor:  new BABYLON.Color3(0.35, 0.65, 1.0),
     haloColor:  new BABYLON.Color3(0.18, 0.38, 1.0),
     lightColor: new BABYLON.Color3(0.45, 0.65, 1.0),
-    maxIntensity: 2.5, contrib: 0.30, size: 10 },
+    maxIntensity: 5.0, contrib: 0.30, size: 10 },
   { clusterAngle: 2 * T3,
     meshColor:  new BABYLON.Color3(1.0, 0.55, 0.22),
     haloColor:  new BABYLON.Color3(0.8,  0.28, 0.06),
     lightColor: new BABYLON.Color3(1.0, 0.58, 0.28),
-    maxIntensity: 1.8, contrib: 0.20, size:  8 },
+    maxIntensity: 3.6, contrib: 0.20, size:  8 },
 ];
 
 function buildSunMesh(scene, def, idx, ORBIT_RADIUS) {
@@ -60,7 +60,7 @@ export function createSunSystem(scene, gridW, gridH, { hemiLight, dirLight, glow
   const ORBIT_RADIUS = Math.max(gridW, gridH) * 0.85;
   const sunObjects   = SUN_DEFS.map((def, i) => buildSunMesh(scene, def, i, ORBIT_RADIUS));
 
-  let smoothAmbient = 0.75;
+  let smoothAmbient = 1.35;
 
   function update(sunElapsedMs, latestWorld) {
     const dayTicks      = latestWorld?.dayTicks  ?? 100;
@@ -102,18 +102,18 @@ export function createSunSystem(scene, gridW, gridH, { hemiLight, dirLight, glow
         const dir = worldCenter.subtract(sun.root.position).normalize();
         dirLight.direction.copyFrom(dir);
         dirLight.position.copyFrom(sun.root.position);
-        dirLight.intensity = 1.5 * vis;
+        dirLight.intensity = 3.4 * vis;
       }
     }
 
-    const targetAmbient = Math.max(0.22, Math.min(1.1, totalContrib * 1.7));
+    const targetAmbient = Math.max(0.45, Math.min(2.2, totalContrib * 2.7));
     smoothAmbient += (targetAmbient - smoothAmbient) * 0.028;
     hemiLight.intensity = smoothAmbient;
 
     const night = 1 - Math.min(1, totalContrib * 1.4);
-    scene.clearColor.set(0.09 - night * 0.04, 0.09 - night * 0.045, 0.14 + night * 0.02, 1);
-    scene.fogColor.set(0.09 - night * 0.04, 0.09 - night * 0.045, 0.14 + night * 0.02);
-    glowLayer.intensity = 0.28 + night * 0.30;
+    scene.clearColor.set(0.16 - night * 0.09, 0.15 - night * 0.08, 0.22 - night * 0.03, 1);
+    scene.fogColor.set(0.16 - night * 0.09, 0.15 - night * 0.08, 0.22 - night * 0.03);
+    glowLayer.intensity = 0.40 + night * 0.35;
   }
 
   return { update };

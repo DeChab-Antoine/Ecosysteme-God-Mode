@@ -23,10 +23,9 @@ export function makeAlien(world, x, y, template) {
     age: 0,
     lifespan: template.lifespan,
     
-    // Clonage 
-    duplicationCost: template.duplicationCost,
-    duplicationTick: template.duplicationTick,
-    duplicationTickDelay: template.duplicationTickDelay
+    // Clonage
+    duplicationCost:   template.duplicationCost,
+    duplicationChance: template.duplicationChance ?? 0,
   };
 
   world.aliens.set(id, alien);

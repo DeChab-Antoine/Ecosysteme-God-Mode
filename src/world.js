@@ -15,21 +15,27 @@ export function createWorld({ gridW, gridH, dayTicks, nightTicks, seed }) {
 
     // Entités
     poisonPlants: new Map(), // plantes poison, key -> { x, y }
-    aliens: new Map(),       // aliens, id -> { id, x, y, E, Emax, R }
+    ragePlants: new Map(),   // plantes de rage, key -> { x, y }
+    aliens: new Map(),       // aliens normaux, id -> { id, x, y, E, Emax, R }
+    aliens2: new Map(),      // aliens mutants (nés d'une plante rage), id -> { ... }
     blobs: new Map(),        // blobs, id -> { id, x, y, E, Emax }
 
     // Occupation (pour empêcher spawn sur case déjà prise)
     occupiedPoisonPlants: new Set(),
+    occupiedRagePlants: new Set(),
     occupiedAliens: new Set(),
+    occupiedAliens2: new Set(),
     occupiedBlobs: new Set(),
 
     // Compteurs d'ID des entites autonomes.
     nextAlienId: 1,
+    nextAlien2Id: 1,
     nextBlobId: 1,
     maxBlobs: 120,  // injecté depuis config au démarrage
 
     // Événements de kills (lus et vidés par le renderer/main.js)
     poisonKillEvents: [],
-    nukeEvents: [],       // { x, y, radius } — produits par l'action Frappe du joueur
+    nukeEvents: [],         // { x, y, radius } — produits par l'action Frappe du joueur
+    transformEvents: [],    // { alienId, x, y } — alien → alien2, consommés par le renderer
   };
 }

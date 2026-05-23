@@ -111,12 +111,95 @@ body {
 }
 
 .alien-col  { color: #c880f0; }
+.alien2-col { color: #ff7030; }
 .blob-col   { color: #ff5090; }
 .poison-col { color: #40e855; }
 
 #popChart {
   width: 100% !important;
   height: 90px !important;
+}
+
+/* === Succes (haut-gauche) === */
+#achievementsPanel {
+  top: 16px;
+  left: 16px;
+  width: 280px;
+  pointer-events: none;
+}
+
+#achievementsHeader {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: #ffd080;
+  margin-bottom: 8px;
+}
+
+.achievement-item {
+  display: grid;
+  grid-template-columns: 18px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 7px 0;
+  border-top: 1px solid rgba(80, 100, 200, 0.14);
+}
+
+.achievement-item:first-child {
+  border-top: none;
+}
+
+.achievement-icon {
+  color: #506080;
+  font-size: 13px;
+}
+
+.achievement-title {
+  font-size: 11px;
+  color: #6878b0;
+}
+
+.achievement-desc {
+  font-size: 9px;
+  color: #404060;
+  margin-top: 2px;
+}
+
+.achievement-item.done .achievement-icon  { color: #ffd080; }
+.achievement-item.done .achievement-title { color: #ffd080; }
+.achievement-item.done .achievement-desc  { color: #706840; }
+
+@keyframes achUnlock {
+  0%   { background: rgba(255, 200, 60, 0.22); }
+  100% { background: transparent; }
+}
+
+.achievement-item.new {
+  animation: achUnlock 3.5s ease forwards;
+  border-radius: 6px;
+}
+
+.achievement-name {
+  font-size: 11px;
+  color: #b0c0e8;
+  line-height: 1.2;
+}
+
+.achievement-desc {
+  font-size: 9px;
+  color: #596888;
+  line-height: 1.3;
+  margin-top: 2px;
+}
+
+.achievement-reward {
+  font-size: 11px;
+  color: #ffd080;
+  white-space: nowrap;
+}
+
+.achievement-item.done .achievement-name {
+  color: #e8f0ff;
 }
 
 /* === Contrôles (bas-gauche) === */
@@ -326,6 +409,7 @@ kbd {
 
 .shop-icon   { font-size: 24px; line-height: 1; margin-bottom: 5px; }
 .icon-poison { color: #40e855; }
+.icon-rage   { color: #ff3030; }
 .icon-nuke   { color: #ff7030; }
 
 .shop-name {
@@ -480,10 +564,10 @@ kbd {
 }
 
 #introContent h1 {
-  font-size: 48px;
+  font-size: 40px;
   color: #c080ff;
   text-transform: uppercase;
-  letter-spacing: 8px;
+  letter-spacing: 4px;
   margin-bottom: 6px;
   text-shadow: 0 0 36px rgba(180, 80, 255, 0.55), 0 0 80px rgba(140, 40, 220, 0.25);
   animation: titleGlow 3.5s ease-in-out infinite alternate;
@@ -497,16 +581,16 @@ kbd {
 .intro-subtitle {
   font-size: 11px;
   color: #4a5278;
-  letter-spacing: 3.5px;
+  letter-spacing: 2.5px;
   text-transform: uppercase;
-  margin-bottom: 40px;
+  margin-bottom: 28px;
 }
 
 .intro-lore {
   font-size: 14px;
   color: #7888b8;
-  line-height: 2.1;
-  margin-bottom: 44px;
+  line-height: 1.75;
+  margin-bottom: 32px;
 }
 
 .intro-lore p  { margin-bottom: 4px; }

@@ -17,12 +17,18 @@ export function createViewState() {
     speedMultiplier: 1,
     forceNight: false,
     points: 10,
-    selectedShopItem: null,   // "poisonPlant" | "nuke" | null
+    selectedShopItem: null,   // "poisonPlant" | "ragePlant" | "nuke" | null
     gameOver: false,
     cameraMode: true,         // true = clic gauche orbite | false = clic gauche place
-    _alienCount: 0,           // caches mis à jour chaque tick pour shopBar
+    _alienCount: 0,           // total aliens + mutants (mis à jour chaque tick)
+    _alien2Count: 0,
     _tick: 0,
     cooldownUntilTick: {},    // { poisonPlant: N, nuke: N } — tick d'expiration du cooldown
+    achievementStats: {
+      poisonAlienKills: 0,
+      bestNukeAlienKills: 0,
+    },
+    unlockedAchievements: {},
 
     // =========================
     // Paramétrage centralisé
@@ -57,23 +63,21 @@ export function createViewState() {
             R: 8,
             lifespan: 10000,
             duplicationCost: 150,
-            duplicationTickDelay: 1000,
-            duplicationTick: 0,
+            duplicationChance: 0.005,
           };
         },
       },
 
       initialBlobs: {
-        count: 16,
+        count: 30,
         maxAttempts: 5000,
-        maxBlobs: 120,       // plafond global anti-explosion
+        maxBlobs: 100,       // plafond global anti-explosion
 
         createBlobTemplate: (world) => {
           return {
-            lifespan: 1400,
-            valE: 50,               // énergie donnée à l'alien qui le mange
-            duplicationTickDelay: 350,
-            duplicationTick: 0,
+            lifespan: 4000,              // ~400s à ×1 — vivent bien plus longtemps
+            valE: 50,                    // énergie donnée à l'alien qui le mange
+            duplicationChance: 0.005,     // 0.5% de chance de duplication par tick
           };
         },
       },
@@ -87,11 +91,13 @@ export function createViewState() {
         startingPoints: 10,
         costs: {
           poisonPlant: 5,
+          ragePlant:   12,
           nuke:        30,
         },
         cooldownTicks: {
-          poisonPlant: 20,   // 2s à ×1 — évite le spam mais reste fluide
-          nuke:        300,  // 30s à ×1 — arme lourde, cooldown significatif
+          poisonPlant: 6,    // 0.6s à ×1 — action principale, doit rester très réactive
+          ragePlant:   45,   // 4.5s à ×1 — contrôle indirect des aliens
+          nuke:        90,   // 9s à ×1 — arme lourde mais utilisable plusieurs fois
         },
         winAliens:  0,
         loseAliens: 100,

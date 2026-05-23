@@ -2,10 +2,11 @@ import { createWorld } from "./world.js";
 import { mulberry32 } from "./rng.js";
 import { createRenderer } from "./renderers/createRenderer.js";
 import { createViewState } from "./viewState.js";
-import { spawnPoisonPlantAt } from "./systems/plantSystem.js";
+import { spawnPoisonPlantAt, spawnRagePlantAt } from "./systems/plantSystem.js";
 import { spawnInitialAliens } from "./systems/alienSpawnSystem.js";
 import { spawnInitialBlobs, updateBlobDay } from "./systems/blobSystem.js";
 import { updateAlienDay } from "./systems/alienSystem.js";
+import { updateAlien2Day } from "./systems/alien2System.js";
 import { createPopulationChart } from "./ui/populationChart.js";
 import { cellKey } from "./systems/worldOps.js";
 import { createAudioManager } from "./audio/audioManager.js";
@@ -21,8 +22,10 @@ const eventLogEl  = document.getElementById("eventLog");
 const speedBadgeEl = document.getElementById("speedBadge");
 const pauseBadgeEl = document.getElementById("pauseBadge");
 const phaseLabelEl = document.getElementById("phaseLabel");
-const countAliensEl = document.getElementById("countAliens");
-const countBlobsEl  = document.getElementById("countBlobs");
+const countAliensEl  = document.getElementById("countAliens");
+const countAlien2sEl = document.getElementById("countAlien2s");
+const countBlobsEl   = document.getElementById("countBlobs");
+const achievementsListEl = document.getElementById("achievementsList");
 
 // =========================
 // Etat de vue + config centralisée
@@ -81,6 +84,83 @@ function logEvent(msg) {
 }
 
 // =========================
+// Succes
+// =========================
+let hadMutation = false; // vrai dès qu'un alien s'est transformé en mutant
+
+const ACHIEVEMENTS = [
+  {
+    id: "poison_master",
+    name: "Piege toxique",
+    desc: "Empoisonner 5 aliens",
+    reward: 35,
+    isDone: () => viewState.achievementStats.poisonAlienKills >= 5,
+    progress: () => `${Math.min(viewState.achievementStats.poisonAlienKills, 5)}/5`,
+  },
+  {
+    id: "perfect_nuke",
+    name: "Frappe chirurgicale",
+    desc: "Tuer 4 aliens avec une seule frappe",
+    reward: 45,
+    isDone: () => viewState.achievementStats.bestNukeAlienKills >= 4,
+    progress: () => `${Math.min(viewState.achievementStats.bestNukeAlienKills, 4)}/4`,
+  },
+  {
+    id: "early_control",
+    name: "Controle precoce",
+    desc: "Descendre a 35 aliens avant le jour 5",
+    reward: 50,
+    isDone: () => world.day <= 5 && world.aliens.size + world.aliens2.size <= 35,
+    progress: () => world.day <= 5 ? `${world.aliens.size + world.aliens2.size}/35` : "raté",
+  },
+  {
+    id: "first_mutation",
+    name: "Première mutation",
+    desc: "⚗ Un alien absorbe une plante rage",
+    reward: 0,
+    isDone: () => hadMutation,
+    progress: () => hadMutation ? "✓" : "0/1",
+  },
+  {
+    id: "epidemic_contained",
+    name: "Épidémie maîtrisée",
+    desc: "☣ Éliminer tous les mutants",
+    reward: 25,
+    isDone: () => hadMutation && world.aliens2.size === 0,
+    progress: () => hadMutation ? (world.aliens2.size === 0 ? "✓" : `${world.aliens2.size} restants`) : "aucun mutant",
+  },
+];
+
+function renderAchievements() {
+  if (!achievementsListEl) return;
+  achievementsListEl.innerHTML = ACHIEVEMENTS.map((achievement) => {
+    const done = !!viewState.unlockedAchievements[achievement.id];
+    return `
+      <div class="achievement-item ${done ? "done" : ""}">
+        <div class="achievement-icon">${done ? "OK" : "--"}</div>
+        <div>
+          <div class="achievement-name">${achievement.name}</div>
+          <div class="achievement-desc">${achievement.desc} (${achievement.progress()})</div>
+        </div>
+        <div class="achievement-reward">+${achievement.reward}</div>
+      </div>
+    `;
+  }).join("");
+}
+
+function checkAchievements() {
+  for (const achievement of ACHIEVEMENTS) {
+    if (viewState.unlockedAchievements[achievement.id]) continue;
+    if (!achievement.isDone()) continue;
+
+    viewState.unlockedAchievements[achievement.id] = true;
+    viewState.points += achievement.reward;
+    logEvent(`Succes : ${achievement.name} (+${achievement.reward} pts)`);
+  }
+  renderAchievements();
+}
+
+// =========================
 // UI stats
 // =========================
 function updateStatsUI(phase) {
@@ -89,8 +169,9 @@ function updateStatsUI(phase) {
     phaseLabelEl.textContent = isNight ? `Nuit — Jour ${world.day}` : `Jour ${world.day}`;
     phaseLabelEl.className   = isNight ? "night" : "";
   }
-  if (countAliensEl) countAliensEl.textContent = world.aliens.size;
-  if (countBlobsEl)  countBlobsEl.textContent  = world.blobs.size;
+  if (countAliensEl)  countAliensEl.textContent  = world.aliens.size;
+  if (countAlien2sEl) countAlien2sEl.textContent = world.aliens2.size;
+  if (countBlobsEl)   countBlobsEl.textContent   = world.blobs.size;
   if (speedBadgeEl)  speedBadgeEl.textContent  = `×${viewState.speedMultiplier}`;
   if (pauseBadgeEl)  pauseBadgeEl.style.display = viewState.paused ? "inline-block" : "none";
 }
@@ -115,6 +196,12 @@ function tryPlacePoisonPlant(x, y) {
   return spawnPoisonPlantAt(world, gx, gy);
 }
 
+function tryPlaceRagePlant(x, y) {
+  const gx = Math.max(0, Math.min(world.gridW - 1, x));
+  const gy = Math.max(0, Math.min(world.gridH - 1, y));
+  return spawnRagePlantAt(world, gx, gy);
+}
+
 function fireNukeAt(x, y) {
   const r2 = NUKE_RADIUS * NUKE_RADIUS;
   let aliensKilled = 0;
@@ -125,6 +212,15 @@ function fireNukeAt(x, y) {
     if (dx * dx + dy * dy <= r2) {
       world.occupiedAliens.delete(cellKey(world, alien.x, alien.y));
       world.aliens.delete(id);
+      aliensKilled++;
+    }
+  }
+
+  for (const [id, alien2] of world.aliens2.entries()) {
+    const dx = alien2.x - x, dy = alien2.y - y;
+    if (dx * dx + dy * dy <= r2) {
+      world.occupiedAliens2.delete(cellKey(world, alien2.x, alien2.y));
+      world.aliens2.delete(id);
       aliensKilled++;
     }
   }
@@ -205,9 +301,19 @@ function tick() {
 
   world.poisonKillEvents.length = 0;
 
+  // Reconstruction des sets d'occupation depuis les Maps d'entités.
+  // Nécessaire car les entités du même type se traversent mutuellement (pas de blocage
+  // inter-même-type dans moveTo), ce qui peut laisser des clés périmées dans les sets.
+  world.occupiedAliens.clear();
+  for (const a of world.aliens.values())  world.occupiedAliens.add(cellKey(world, a.x, a.y));
+  world.occupiedAliens2.clear();
+  for (const a of world.aliens2.values()) world.occupiedAliens2.add(cellKey(world, a.x, a.y));
+  world.occupiedBlobs.clear();
+  for (const b of world.blobs.values())   world.occupiedBlobs.add(cellKey(world, b.x, b.y));
+
   // Graphique — échantillonnage toutes les 5 ticks
   if (world.tick % 5 === 0) {
-    popChart.pushPoint(world.tick, world.aliens.size, world.blobs.size);
+    popChart.pushPoint(world.tick, world.aliens.size, world.blobs.size, world.aliens2.size);
     popChart.keepLast(MAX_CHART_POINTS);
   }
 
@@ -234,6 +340,31 @@ function tick() {
       if (!alienIdsBefore.has(id)) audio.playBirth(vol(alien.x, alien.y) * 0.45);
     }
 
+    // Détection transformation alien → alien2
+    if (world.transformEvents.length > 0 && !hadMutation) {
+      hadMutation = true;
+    }
+    for (const evt of world.transformEvents) {
+      logEvent(`Mutation ! Un alien s'est transformé en mutant !`);
+    }
+
+    // Mise à jour mutants (alien2)
+    const alien2IdsBefore = new Set(world.aliens2.keys());
+    for (const alien2 of world.aliens2.values()) {
+      const prevAction = alien2.lastAction;
+      updateAlien2Day(world, alien2);
+      if (alien2.lastAction !== prevAction && alien2.lastAction?.tick === world.tick) {
+        if (alien2.lastAction.type === "attackAlien") {
+          viewState.points += 5;
+          audio.playDeath(vol(alien2.x, alien2.y) * 0.6);
+          logEvent(`Mutant élimine un alien ! (+5 pts)`);
+        }
+      }
+    }
+    for (const [id, alien2] of world.aliens2.entries()) {
+      if (!alien2IdsBefore.has(id)) audio.playBirth(vol(alien2.x, alien2.y) * 0.55);
+    }
+
     // Mise à jour blobs
     const blobIdsBefore = new Set(world.blobs.keys());
     const movingBlobs   = new Set();
@@ -254,9 +385,14 @@ function tick() {
     for (const evt of world.poisonKillEvents) {
       const v = vol(evt.x, evt.y);
       if (evt.type === "alien") {
+        viewState.achievementStats.poisonAlienKills++;
         viewState.points += 10;
         audio.playDeath(v * 0.7);
         logEvent(`Alien empoisonné ! (+10 pts)`);
+      } else if (evt.type === "alien2") {
+        viewState.points += 15;
+        audio.playDeath(v * 0.85);
+        logEvent(`Mutant empoisonné ! (+15 pts)`);
       } else if (evt.type === "blob") {
         viewState.points += 5;
         audio.playDeath(v * 0.4);
@@ -279,20 +415,22 @@ function tick() {
           deadCount++;
         }
       }
-      if (deadCount > 0) logEvent(`${deadCount} alien(s) ont disparu cette nuit`);
+      // Les mutants (alien2) sont immortels — ils ne meurent pas la nuit.
+      if (deadCount > 0) logEvent(`${deadCount} entité(s) ont disparu cette nuit`);
       world.day++;
     }
   }
 
   // Vérification victoire / défaite — après toutes les mises à jour du tick
+  const totalAliens = world.aliens.size + world.aliens2.size;
   if (!viewState.gameOver && world.tick > GRACE_TICKS) {
-    if (world.aliens.size === WIN_ALIENS) {
+    if (totalAliens === WIN_ALIENS) {
       viewState.gameOver = true;
       viewState.paused   = true;
       if (winLoseScreen) winLoseScreen.showWin();
       audio.playDeath();
-      logEvent(`VICTOIRE — tous les aliens ont été éliminés !`);
-    } else if (world.aliens.size >= LOSE_ALIENS) {
+      logEvent(`VICTOIRE — tous les aliens et mutants ont été éliminés !`);
+    } else if (totalAliens >= LOSE_ALIENS) {
       viewState.gameOver = true;
       viewState.paused   = true;
       if (winLoseScreen) winLoseScreen.showLose();
@@ -302,8 +440,10 @@ function tick() {
   }
 
   // UI — une seule passe, après toutes les modifications d'état
-  viewState._alienCount = world.aliens.size;
-  viewState._tick       = world.tick;
+  viewState._alienCount  = world.aliens.size + world.aliens2.size;
+  viewState._alien2Count = world.aliens2.size;
+  viewState._tick        = world.tick;
+  checkAchievements();
   updateStatsUI(phase);
   if (shopBar) shopBar.refresh();
 
@@ -354,21 +494,35 @@ function startGame() {
         shopBar.refresh();
       }
 
+      if (entity === "ragePlant" && tryPlaceRagePlant(x, z)) {
+        viewState.points -= cost;
+        setCooldown("ragePlant");
+        audio.playSpawn(vol(x, z) * 0.5);
+        logEvent(`Rage posée (-${cost} pts)`);
+        shopBar.refresh();
+      }
+
       if (entity === "nuke") {
         viewState.points -= cost;
         setCooldown("nuke");
         const { aliensKilled, blobsKilled } = fireNukeAt(x, z);
+        viewState.achievementStats.bestNukeAlienKills = Math.max(
+          viewState.achievementStats.bestNukeAlienKills,
+          aliensKilled
+        );
         viewState.points += aliensKilled * 10 + blobsKilled * 2;
         audio.playDeath(vol(x, z) * 1.1);
         const gain = aliensKilled * 10 + blobsKilled * 2 - cost;
         const gainStr = gain >= 0 ? `+${gain}` : `${gain}`;
         logEvent(`Frappe ! ${aliensKilled} aliens, ${blobsKilled} blobs (${gainStr} pts)`);
+        checkAchievements();
         shopBar.refresh();
       }
     });
   }
 
   logEvent("Bienvenue — vous êtes le Dieu de ce monde.");
+  renderAchievements();
   gameInterval = setInterval(tick, BASE_TICK_MS);
 }
 

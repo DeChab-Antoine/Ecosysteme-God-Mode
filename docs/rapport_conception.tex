@@ -1,0 +1,510 @@
+﻿\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{booktabs}
+\usepackage{fancyhdr}
+\usepackage{setspace}
+
+\geometry{margin=2.5cm}
+\graphicspath{{./}{docs/}}
+\setlength{\headheight}{34pt}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!50!black,
+  urlcolor=blue!50!black
+}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  columns=fullflexible
+}
+
+\begin{document}
+
+\begin{titlepage}
+\thispagestyle{empty}
+\centering
+
+% --- Logo DS4H ---
+\includegraphics[width=1\textwidth]{logo_ds4h.png}\par
+\vspace{2cm}
+
+% --- Intitulé du master ---
+{\scshape\LARGE Master 1 Informatique \par}
+\vspace{1.5cm}
+
+% --- Type de document ---
+{\Large\bfseries Document de conception\par}
+\vspace{1.5cm}
+
+\hrule
+\vspace{1.2cm}
+
+% --- Titre ---
+{\huge\bfseries
+Exoplanet God Mode\\[0.3em]
+Jeu God Mode sur planète extraterrestre\par}
+\vspace{1cm}
+
+\hrule
+\vspace{1.5cm}
+
+% --- Auteurs / Encadrants ---
+\noindent
+\begin{minipage}[t]{0.48\textwidth}
+    \raggedright
+    \textbf{Auteurs :}\\[0.3em]
+    \textsc{Hugo Viana}\\
+    \textsc{Antoine de Chabannes}
+\end{minipage}
+\hfill
+\begin{minipage}[t]{0.48\textwidth}
+    \raggedleft
+    \textbf{Encadrants :}\\[0.3em]
+    \textsc{Michel Buffa}\\
+\end{minipage}
+
+\vfill
+
+% --- Résumé ---
+{\bfseries Résumé\par}
+\vspace{0.5cm}
+\begin{spacing}{1.05}
+Ce rapport présente la conception et le développement d'\emph{Exoplanet God Mode}. L'idée de départ était celle d'un \og dieu d'un écosystème \fg{} : un monde stable, autonome, que le joueur observe puis perturbe avec des points d'influence. Le projet a ensuite été réduit et transformé pour aboutir à une version jouable : une planète extraterrestre, trois populations autonomes (aliens, mutants, blobs), des outils de God Mode, une économie de points et un objectif clair. Nous détaillons ici les choix qui ont réellement structuré le projet : conserver la simulation sur grille, réduire une ambition initiale trop large, séparer le rendu 3D de l'état du monde, et transformer des règles locales d'agents en décisions compréhensibles pour le joueur.
+\end{spacing}
+
+\vfill
+
+{\large 23 mai 2026\par}
+
+\end{titlepage}
+
+% --- Style de page global ---
+\fancyhf{}  % on vide tout
+\fancyheadoffset{0.5cm}
+
+% Logo à gauche
+\fancyhead[L]{%
+  \includegraphics[height=1cm]{logo_ds4h.png}
+}
+
+\fancyhead[R]{\nouppercase{\leftmark}}
+\fancyfoot[C]{\thepage}
+
+% Barre sous l'en-tête
+\renewcommand{\headrulewidth}{0.6pt}
+% Utiliser ce style partout
+\pagestyle{fancy}
+
+\tableofcontents
+\newpage
+
+\section{Introduction}
+
+\subsection{Concept général}
+
+\emph{Exoplanet God Mode} est un jeu dans lequel le joueur agit comme une force extérieure sur une planète extraterrestre. Le monde contient plusieurs populations autonomes : des aliens, des mutants (aliens transformés) et des blobs. Le joueur dispose d'outils d'intervention : plantes poison, plantes rage et frappes orbitales. Les agents se déplacent, perçoivent leur environnement, se dupliquent ou disparaissent selon des règles locales.
+
+Le choix du God Mode n'a pas été ajouté comme un habillage final. Il vient de l'idée de départ : le joueur devait être une forme de puissance extérieure capable de déséquilibrer un écosystème. Dans le document de conception initial, le monde devait commencer stable, avec humains, carottes, cochons et cycle pluie/soleil. Le joueur gagnait des points d'influence et les dépensait pour modifier progressivement les conditions de survie. Cette logique a été conservée : le joueur ne contrôle pas directement une créature, il agit sur les conditions du système.
+
+\subsection{Objectif du joueur}
+
+L'objectif actuel est d'empêcher les aliens d'envahir la planète. Le joueur commence avec peu de points, place des plantes poison, peut déclencher une frappe de zone, puis récupère des points lorsqu'il élimine des entités. Les aliens doivent être éliminés avant d'atteindre un seuil critique.
+
+Cet objectif est une évolution de l'idée initiale. Au départ, le joueur devait plutôt casser volontairement la stabilité de l'écosystème et provoquer l'extinction des humains le plus vite possible. En cours de développement, nous avons inversé et simplifié cette intention pour obtenir une boucle plus lisible : le joueur reste une force extérieure, mais il intervient maintenant pour contenir une prolifération. Le coeur du gameplay reste le même : observer une simulation autonome, identifier les bons points d'intervention, puis perturber localement le système.
+
+\subsection{Lien avec le thème}
+
+Le jeu respecte le thème par son approche d'agents autonomes : les aliens et les blobs ne sont pas déplacés directement par le joueur, mais suivent des règles de perception, de poursuite, de fuite, de mémoire et de duplication. L'intérêt vient de l'interaction entre ces règles simples et les actions du joueur.
+
+Le passage à une planète extraterrestre est aussi un choix de cohérence. Dans les premières versions, les entités étaient nommées humain, cochon et carotte. Ces noms étaient pratiques pour prototyper vite, mais ils rendaient certains comportements incohérents, notamment la duplication ou l'attraction par une plante mortelle. Le renommage vers aliens, blobs et plantes poison a permis d'assumer un écosystème fictionnel où les règles biologiques sont stylisées. Ce n'est pas seulement cosmétique : le vocabulaire du code, les assets et les mécaniques racontent désormais le même jeu.
+
+\subsection{Écart avec l'idée initiale}
+
+Le document de départ était volontairement ambitieux. Il prévoyait des humains avec énergie, vision, faim, vitesse, physique, intelligence, altruisme, durée de vie, reproduction sexuée, héritage de caractéristiques et mutations. Les carottes devaient dépendre d'un équilibre pluie/soleil, les cochons devaient manger des carottes pour grandir et se reproduire, et le joueur devait disposer de points d'influence, de quêtes, de succès et de courbes statistiques.
+
+Nous n'avons pas abandonné cette idée parce qu'elle était mauvaise, mais parce qu'elle était trop large pour arriver à un jeu jouable dans le temps du projet. Nous avons donc choisi d'en extraire la colonne vertébrale : un écosystème autonome, des populations qui dépendent les unes des autres, des paramètres de survie, des statistiques visibles et une intervention indirecte du joueur. Les humains sont devenus des aliens, les cochons des blobs, les carottes et les perturbations environnementales ont été remplacées par des plantes poison et une frappe de zone. Cette réduction a permis de finir une boucle complète plutôt que de laisser plusieurs systèmes complexes à moitié implémentés.
+
+\section{Historique du développement}
+
+\subsection{Prototype 0 : simulation minimale}
+
+Le projet a commencé par ce que nous appelions le prototype 0 : une simulation minimale, stable, sans joueur, sur terrain 2D borné. L'objectif n'était pas encore de faire un beau jeu, mais de vérifier une hypothèse de base : peut-on faire vivre des agents autonomes dans un espace limité sans extinction immédiate ni erreur de simulation ?
+
+Dans le document initial, ce prototype devait contenir des humains autonomes, des carottes comme ressource, un cycle jour/nuit, une énergie \texttt{E} entre 0 et \texttt{Emax}, une vision \texttt{R}, et une statistique de population au cours du temps. La validation était très concrète : la simulation devait tourner sans erreur, la population ne devait pas tomber à zéro immédiatement, et la décroissance devait être progressive en l'absence de reproduction.
+
+Ce point est important pour comprendre la suite : nous n'avons pas commencé par le rendu 3D. Nous avons commencé par une boucle agent/ressource suffisamment simple pour être observable, mesurable et corrigeable.
+
+Les premiers commits importants montrent cette progression :
+
+\begin{itemize}[noitemsep]
+  \item \texttt{P0-01 : Initialiser le monde 2D borné}
+  \item \texttt{P0-02 : Implémenter l'entité Carotte}
+  \item \texttt{P0-03 : Implémenter l'entité Humain}
+  \item \texttt{P0-04 : Boucle de l'humain}
+\end{itemize}
+
+Même si ces noms ont ensuite été remplacés, ils correspondent à la phase de validation technique : une ressource, un agent, une boucle jour/nuit et une mesure de population. Cette étape a été utile parce qu'elle a donné un noyau testable très tôt. Nous pouvions modifier une règle et observer immédiatement si le monde restait stable.
+
+\subsection{Ajout des règles de simulation}
+
+Après la mise en place du monde, plusieurs règles ont été ajoutées : durée de vie, statistiques de population, reproduction, duplication et vieillissement des ressources. Ces étapes ont fait passer le projet d'un affichage d'entités à une vraie simulation.
+
+\begin{itemize}[noitemsep]
+  \item \texttt{P0-05 - Stats population}
+  \item \texttt{P0-06 : Durée de vie}
+  \item \texttt{Reproduction (v0.1)}
+  \item \texttt{Pourriture carottes}
+  \item \texttt{Duplication (à la place de la repro)}
+\end{itemize}
+
+Le remplacement de la reproduction par une duplication simplifiée a été un vrai arbitrage de conception. Le document initial prévoyait une reproduction plus riche : deux parents, héritage de caractéristiques, mutations, stade bébé, progression vers l'âge adulte et impossibilité de se reproduire avant maturité. C'était intéressant sur le papier, mais cela déplaçait le projet vers une simulation génétique complète. Pour le temps disponible, le risque était de passer trop de temps sur l'hérédité sans obtenir de jeu jouable.
+
+La duplication nous a permis de garder l'effet important pour le gameplay : une population peut croître et devenir un problème. Nous avons donc conservé la dynamique de population, mais supprimé la généalogie et les mutations.
+
+\subsection{Ajout d'une deuxième espèce}
+
+L'ajout d'une deuxième population, aujourd'hui les blobs, vient directement de l'idée initiale des cochons. Dans le document de départ, les cochons étaient une ressource plus importante que les carottes : ils devaient se déplacer, chercher des carottes, grandir, se reproduire et fournir beaucoup d'énergie aux humains. Nous avons simplifié cette logique en une population de blobs, mobile et consommable, qui sert de ressource aux aliens.
+
+Cette simplification conserve l'intérêt principal : une relation de prédation. Les aliens peuvent poursuivre les blobs pour récupérer de l'énergie, tandis que les blobs peuvent fuir et se dupliquer. La carte cesse alors d'être une simple collection d'objets ; elle devient un système avec des réactions en chaîne.
+
+Cette étape a aussi révélé un problème d'équilibrage immédiat. Si les blobs se dupliquaient trop vite, ils remplissaient la carte et rendaient la simulation illisible. Si les aliens étaient trop efficaces, les blobs disparaissaient et les aliens mouraient ensuite faute d'énergie. Le système a donc progressivement intégré des délais de duplication, un plafond global \texttt{maxBlobs}, et des valeurs d'énergie réglables.
+
+\subsection{Passage au rendu 3D}
+
+Le commit \texttt{premier rendu 3d} marque la bascule vers Babylon.js. Le rendu 2D était utile pour développer vite, mais il donnait surtout une lecture technique de la simulation. Le passage en 3D avait deux objectifs : rendre la démonstration plus convaincante, et donner au joueur l'impression d'observer un monde depuis une position de God Mode. Ce choix a augmenté la complexité du projet, car il a fallu synchroniser des entités logiques sur grille avec des meshes, une caméra, des lumières et des assets.
+
+Le rendu 3D a ensuite été enrichi par :
+
+\begin{itemize}[noitemsep]
+  \item une carte extraterrestre ;
+  \item des décorations fixes ;
+  \item des assets et animations ;
+  \item des effets visuels ;
+  \item une caméra utilisable dans une scène large.
+\end{itemize}
+
+\subsection{Transformation en jeu}
+
+Une difficulté importante a été de passer de \og simulation intéressante \fg{} à \og jeu jouable \fg{}. Dans l'idée initiale, ce passage devait se faire par des points d'influence, des quêtes, des succès et des modifications environnementales comme pluie/soleil. Nous avons gardé le principe des points d'influence, mais nous l'avons transformé en shop plus direct : plantes poison, plantes rage et frappe de zone. Cette décision rend l'intervention du joueur immédiatement visible, ce qui était nécessaire pour une démonstration courte.
+
+Le projet intègre aussi un système de succès, partiellement inspiré de l'idée initiale de quêtes. Cinq succès sont disponibles : récompenser des kills par empoisonnement, une frappe chirurgicale, un contrôle précoce de la population, la première mutation, et l'élimination de tous les mutants. Ces succès encouragent des façons différentes de jouer sans imposer un objectif unique.
+
+Le joueur a désormais des décisions à prendre :
+
+\begin{itemize}[noitemsep]
+  \item observer la population ;
+  \item choisir quand placer une plante poison ;
+  \item économiser pour une frappe plus puissante ;
+  \item accélérer ou mettre en pause la simulation ;
+  \item éviter de laisser les aliens atteindre le seuil de défaite.
+\end{itemize}
+
+\subsection{Restructuration finale}
+
+Le commit \texttt{Nettoyage et re structuration projet} correspond à une étape nécessaire : le projet avait grandi rapidement et certaines responsabilités commençaient à se mélanger. Quand le rendu, l'audio, le shop et la simulation évoluent en même temps, il devient très facile de corriger un bug d'un côté en en créant un autre ailleurs. La restructuration a donc isolé les systèmes de simulation, le rendu, l'audio, l'interface et l'état global. Cette étape n'a pas ajouté une feature visible, mais elle a rendu les dernières itérations beaucoup plus maîtrisables.
+
+\section{Architecture technique}
+
+\subsection{Séparation état / logique / rendu}
+
+L'architecture repose sur une séparation volontaire :
+
+\begin{itemize}[noitemsep]
+  \item \texttt{world.js} contient l'état du monde ;
+  \item \texttt{viewState.js} centralise la configuration et l'état d'interface ;
+  \item \texttt{systems/} contient la logique de simulation ;
+  \item \texttt{renderers/} contient le rendu 2D et 3D ;
+  \item \texttt{ui/} contient les éléments d'interface ;
+  \item \texttt{audio/} contient la gestion audio.
+\end{itemize}
+
+Ce découpage permet de modifier une partie du projet sans réécrire les autres. Par exemple, le passage d'un rendu simple à une scène 3D plus travaillée n'a pas nécessité de réécrire la logique des agents. C'est un point important du projet : nous avons essayé de garder une différence nette entre \og ce qui est vrai dans le monde \fg{} et \og la manière dont on l'affiche \fg{}. Les aliens et les blobs existent d'abord comme données de simulation ; les meshes 3D ne sont qu'une représentation synchronisée.
+
+\subsection{Monde et entités}
+
+Le monde est une grille discrète. Les positions sont stockées en coordonnées entières \texttt{x,y}. Les entités principales sont :
+
+\begin{itemize}[noitemsep]
+  \item \texttt{aliens} : agents que le joueur doit éliminer ; ils chassent les blobs et sont attirés par les plantes ;
+  \item \texttt{aliens2} : mutants nés de la rencontre entre un alien et une plante rage ; immortels, ils chassent exclusivement les aliens normaux ;
+  \item \texttt{blobs} : créatures mobiles consommables par les aliens normaux ;
+  \item \texttt{poisonPlants} : pièges posés par le joueur, mortels au contact pour toute entité ;
+  \item \texttt{ragePlants} : plantes de transformation posées par le joueur, qui convertissent un alien en mutant.
+\end{itemize}
+
+Les entités sont stockées dans des \texttt{Map}, indexées par identifiant pour les aliens et les blobs, et par case pour les plantes poison. Des \texttt{Set} d'occupation permettent de vérifier rapidement si une case est occupée. Ce choix vient d'un problème concret : parcourir toutes les entités à chaque tentative de déplacement devient vite pénible dès que les populations augmentent. Les \texttt{Set} donnent un test d'occupation direct, mais ils introduisent une contrainte : ils doivent toujours rester cohérents avec les \texttt{Map}. Une partie des bugs rencontrés venait justement de cette double représentation.
+
+\subsection{Configuration centralisée}
+
+Le fichier \texttt{viewState.js} joue un rôle important. Il regroupe les paramètres d'équilibrage :
+
+\begin{itemize}[noitemsep]
+  \item taille du monde ;
+  \item durée jour/nuit ;
+  \item population initiale ;
+  \item probabilité de duplication par tick ;
+  \item coûts du shop ;
+  \item seuils de victoire et défaite ;
+  \item cooldowns.
+\end{itemize}
+
+Ce choix facilite les tests. Plutôt que de chercher des valeurs dispersées dans les systèmes, les réglages principaux sont au même endroit. C'était nécessaire parce que l'équilibrage dépend de plusieurs paramètres qui interagissent : population initiale, énergie des aliens, délai de duplication, coût des outils, points gagnés, seuil de défaite et cooldowns. Un petit changement sur un seul de ces paramètres peut rendre la partie trop simple ou impossible.
+
+\section{Comportements et algorithmes}
+
+\subsection{Déplacement sur grille}
+
+Les déplacements se font case par case. Le système évite les sorties du monde et certaines collisions via \texttt{worldOps.js}. La grille simplifie les calculs, rend les comportements reproductibles, et permet d'associer directement gameplay et occupation des cases. C'est un compromis assumé : le déplacement n'est pas physiquement réaliste, mais il est lisible et adapté à une simulation de population. Pour ce projet, la priorité était de comprendre pourquoi un agent prend une décision, pas de simuler un mouvement continu parfait.
+
+\subsection{Perception des aliens}
+
+Les aliens cherchent des cibles selon un rayon de vision. La distance utilisée est la distance au carré, afin d'éviter des calculs de racine carrée inutiles dans une boucle appelée très souvent. Leur hiérarchie de priorité est la suivante : d'abord les plantes rage dans un rayon de 15 cases (transformation en mutant), ensuite les plantes poison dans un rayon de 10 cases (piège), puis les blobs dans leur rayon de vision habituel. Ils peuvent aussi se souvenir brièvement d'une dernière position connue pendant \texttt{PURSUIT\_MEMORY\_TICKS}. Cette mémoire rend le comportement moins mécanique : un alien ne s'arrête pas immédiatement dès qu'un blob sort de son rayon, il continue brièvement sa poursuite.
+
+\subsection{Comportement des blobs}
+
+Les blobs sont conçus comme une population vivante mais vulnérable. Ils peuvent :
+
+\begin{itemize}[noitemsep]
+  \item se déplacer ;
+  \item détecter une menace ;
+  \item fuir les aliens ;
+  \item être attirés par les plantes poison ;
+  \item se dupliquer selon une probabilité par tick.
+\end{itemize}
+
+Le comportement de fuite rend les interactions plus intéressantes : le joueur ne voit pas seulement des points se déplacer, mais des populations avec des priorités différentes. Nous avons volontairement gardé des règles simples, mais hiérarchisées : poison en priorité, menace ensuite, errance sinon. Cette hiérarchie produit des comportements compréhensibles visuellement et évite d'avoir une IA opaque impossible à expliquer dans un rapport.
+
+\subsection{Plantes poison et plantes rage}
+
+Les plantes poison sont l'outil qui relie le mieux simulation et intervention joueur. Elles attirent les entités dans un rayon donné, mais les tuent au contact. Cette règle est volontairement ambivalente : la plante est utile parce qu'elle attire, mais dangereuse parce qu'elle peut aussi tuer des blobs et modifier l'équilibre de nourriture disponible pour les aliens. Une plante bien placée peut faire basculer une zone entière, tandis qu'une plante mal placée gaspille des points et un cooldown.
+
+Les plantes rage introduisent une dynamique supplémentaire. Elles attirent les aliens dans un rayon de 15 cases (priorité maximale dans leur hiérarchie de cibles). Lorsqu'un alien les touche, il se transforme en mutant : une animation de particules marque la transformation, et un mesh distinct remplace l'entité. Le mutant est alors immortel et chassera les aliens normaux. Le joueur doit décider si cette transformation est un avantage (réduire la population d'aliens) ou une menace (un mutant incontrôlable à éliminer avec une plante poison).
+
+\subsection{Contrôle de l'explosion de population}
+
+Un problème récurrent pendant le développement était l'explosion de population des blobs. Une duplication trop rapide rendait la carte illisible, saturait la scène 3D et cassait l'équilibrage, car les aliens avaient alors trop de nourriture. À l'inverse, trop limiter les blobs rendait les aliens incapables de survivre. La solution retenue combine :
+
+\begin{itemize}[noitemsep]
+  \item une probabilité de duplication par tick ;
+  \item un plafond global \texttt{maxBlobs} ;
+  \item un objectif de gameplay qui pousse le joueur à gérer les populations ;
+  \item une économie de points qui récompense les éliminations sans permettre de spammer les outils.
+\end{itemize}
+
+\section{Agents IA}
+
+\subsection{Agents implémentés}
+
+Les agents du projet sont des agents à règles. Ce choix n'est pas un simple raccourci : il correspond à l'état réel du projet et au besoin de garder une simulation lisible. Chaque agent prend une décision à partir d'informations locales : sa position, les entités proches, son état interne et les cases disponibles autour de lui. L'objectif était d'obtenir des comportements observables et explicables, plutôt qu'une boîte noire difficile à déboguer.
+
+Les aliens sont les agents les plus proches d'un comportement de prédation. Ils possèdent une énergie, une durée de vie, un rayon de vision et une mémoire courte. À chaque tick, ils évaluent leur environnement selon un ordre de priorité : attraction par une plante poison proche, recherche d'un blob dans leur rayon de vision, poursuite temporaire d'une dernière position connue, puis errance globale. Cette mémoire courte a été ajoutée pour éviter un comportement trop mécanique où l'alien abandonne immédiatement une cible dès qu'elle sort de son rayon.
+
+Les mutants (\texttt{alien2}) constituent un troisième type d'agent, né de la rencontre entre un alien normal et une plante rage. Leur comportement est délibérément différent : ils ne mangent pas de blobs, ne se reproduisent pas, et ne meurent pas la nuit. En revanche, ils chassent activement les aliens normaux dans un rayon de vision élargi (\(1.5 \times R\)), et ils peuvent être tués par une plante poison ou une frappe orbitale. Cette conception crée une dynamique tendue : la plante rage est un outil à double tranchant pour le joueur. Bien placée, elle génère un mutant qui détruit les aliens normaux ; mal utilisée, elle crée une menace immortelle difficile à contrôler.
+
+Les blobs jouent le rôle de proies mobiles. Leur comportement est volontairement différent de celui des aliens : ils peuvent être attirés par les plantes poison, détecter une menace alien, fuir un alien proche ou se déplacer de manière errante. Ils ne fuient que les aliens normaux, pas les mutants (qui ne les chassent pas). Leur duplication repose sur une probabilité par tick, ce qui rend la dynamique de population moins régulière qu'un simple timer. Cela correspond mieux à l'idée d'écosystème : la population ne croît pas de manière parfaitement prévisible, mais elle reste contrôlée par un plafond global.
+
+Cette IA à règles a l'avantage d'être transparente. Quand un agent agit, nous pouvons expliquer pourquoi : il a vu une plante, il fuit une menace, il poursuit une cible mémorisée ou il erre faute de meilleure option. Cette propriété était importante pour le développement, car les bugs d'équilibrage étaient déjà nombreux. Ajouter une IA plus opaque aurait rendu plus difficile l'identification des problèmes.
+
+\subsection{Ce qui était envisagé avec du reinforcement learning}
+
+Dans une version plus ambitieuse, les agents auraient pu être contrôlés par apprentissage par renforcement. L'idée aurait été de ne plus écrire directement toutes les priorités de comportement, mais de laisser un agent apprendre une politique d'action à partir de récompenses. Par exemple, un alien pourrait recevoir une récompense positive lorsqu'il mange un blob, une pénalité lorsqu'il perd trop d'énergie, et une forte pénalité lorsqu'il meurt sur une plante poison. Un blob pourrait être récompensé lorsqu'il survit longtemps, lorsqu'il garde une distance avec les aliens, ou lorsqu'il participe au maintien de sa population.
+
+Cette approche aurait mieux correspondu à l'ambition initiale du document de conception, qui imaginait des caractéristiques individuelles, de l'adaptation et une évolution des populations dans le temps. Avec du reinforcement learning, les agents auraient pu découvrir des stratégies non écrites explicitement : contourner certaines zones, éviter les plantes après plusieurs morts, ou adapter leur comportement selon la densité de population.
+
+Nous ne l'avons pas implémenté pour plusieurs raisons. D'abord, il aurait fallu définir précisément l'état observable par chaque agent : distances aux ressources, menaces proches, énergie, âge, densité locale, position des plantes, etc. Ensuite, il aurait fallu concevoir une fonction de récompense stable. Une mauvaise récompense peut produire des comportements absurdes, comme des agents qui évitent tout risque mais ne jouent plus leur rôle dans l'écosystème. Enfin, l'entraînement aurait demandé du temps, des tests répétés et probablement une architecture séparée pour simuler beaucoup de parties plus vite que le rendu 3D.
+
+Le choix final a donc été pragmatique : utiliser des agents à règles pour livrer une simulation jouable, compréhensible et réglable. Le reinforcement learning reste une évolution intéressante du projet, mais il aurait été risqué de l'intégrer avant d'avoir une boucle de jeu stable. Une suite possible serait de remplacer progressivement certains comportements par apprentissage, en commençant par un seul type d'agent, par exemple les blobs, et en gardant le reste du système déterministe pour mieux mesurer les effets.
+
+\section{Rendu et direction artistique}
+
+\subsection{Choix de la planète extraterrestre}
+
+Le jeu a été renommé et rethématisé autour d'une planète extraterrestre. Ce choix répond à un problème de cohérence que nous avons réellement rencontré : les premières entités, inspirées d'un écosystème terrestre, ne correspondaient plus aux comportements du jeu. Des aliens et des blobs peuvent se dupliquer ou interagir de manière stylisée sans demander de justification réaliste. Cette direction artistique nous a aussi aidés à prendre des décisions plus franches sur les couleurs, les sons, les particules et les outils du joueur.
+
+\subsection{Rendu 3D}
+
+Le rendu 3D repose sur Babylon.js. Les éléments principaux sont :
+
+\begin{itemize}[noitemsep]
+  \item sol et carte large ;
+  \item lumières jour/nuit ;
+  \item décorations fixes ;
+  \item assets d'entités ;
+  \item synchronisation entre état logique et meshes 3D ;
+  \item effets de particules et événements visuels.
+\end{itemize}
+
+La difficulté principale était de conserver la lisibilité. Une carte trop vide ressemblait à un prototype, mais une carte trop chargée rendait les agents difficiles à suivre. Nous avons donc traité le décor comme un support de lecture, pas seulement comme de la décoration : repères larges, contrastes forts entre entités, caméra assez haute, et assets suffisamment reconnaissables. C'est un compromis constant, car chaque amélioration visuelle peut nuire à la compréhension de la simulation.
+
+\subsection{Assets}
+
+Les assets ont été introduits après la validation du gameplay. Cela évite de dépendre trop tôt du rendu pour juger si le système fonctionne. L'asset \emph{Green Spiky Blob}, par exemple, a motivé le renommage des anciennes entités en \emph{blobs}. Ce renommage rend le vocabulaire du code plus cohérent avec l'apparence finale. Nous avons aussi conservé des meshes de secours côté rendu 3D, car pendant l'intégration des assets il arrive qu'un modèle ne charge pas, soit mal orienté ou ait une échelle inutilisable.
+
+\section{Interface, audio et feedback}
+
+\subsection{Interface}
+
+L'interface sert à rendre la simulation compréhensible :
+
+\begin{itemize}[noitemsep]
+  \item compteurs de population : aliens normaux, mutants, blobs ;
+  \item graphe de population à trois courbes (violet, orange, rose) mis à jour en temps réel ;
+  \item indication jour/nuit ;
+  \item badge de vitesse ;
+  \item état de pause ;
+  \item shop avec trois outils : plante poison (5 pts), plante rage (12 pts), frappe orbitale (30 pts) ;
+  \item journal d'événements (kills par poison, mutations, frappes) ;
+  \item panneau de succès avec progression en temps réel ;
+  \item écran d'introduction ;
+  \item écran victoire/défaite.
+\end{itemize}
+
+Ces éléments ont été ajoutés pour que le jury comprenne rapidement l'état du jeu sans devoir lire le code ou deviner les règles. C'était un point important : une simulation peut être correcte techniquement tout en étant incompréhensible pour un joueur extérieur. L'interface sert donc à rendre visibles les décisions du système : combien d'aliens restent, combien de points sont disponibles, quel outil est sélectionné, et pourquoi une action n'est pas encore possible.
+
+\subsection{Audio}
+
+L'audio a été ajouté tardivement, mais il améliore fortement la perception du jeu. Le gestionnaire audio contient :
+
+\begin{itemize}[noitemsep]
+  \item une ambiance musicale séquencée ;
+  \item des sons de naissance ;
+  \item des sons de mort ;
+  \item des sons de consommation ;
+  \item des pas de blobs, gérés par boucle et volume.
+\end{itemize}
+
+Le volume dépend approximativement de la position dans le monde via le renderer. L'objectif n'était pas une spatialisation parfaite, mais un feedback suffisant pour renforcer l'impression de monde vivant. L'audio a aussi posé un problème pratique : si chaque blob déclenche un son sans contrôle, le résultat devient vite agressif. Nous avons donc géré des boucles de pas par identifiant et arrêté celles des blobs qui ne sont plus en mouvement.
+
+\section{Difficultés rencontrées}
+
+\subsection{Réduire une idée initiale trop ambitieuse}
+
+La première difficulté a été de réduire l'idée de départ sans la vider de son intérêt. Le document initial décrivait presque une simulation d'écosystème complète : humains avec statistiques héritées, reproduction sexuée, bébés, mutations, cochons dépendants des carottes, carottes dépendantes du soleil et de la pluie, quêtes, succès et courbes statistiques. Chaque système était cohérent séparément, mais leur combinaison aurait demandé beaucoup plus de temps que celui disponible.
+
+Le risque principal était de développer plusieurs systèmes partiels sans jamais obtenir une expérience jouable. Nous avons donc choisi de garder les relations essentielles plutôt que toutes les entités prévues. Les humains sont devenus des aliens, les cochons sont devenus des blobs, et les perturbations environnementales ont été remplacées par des outils plus directs. Cette réduction a été frustrante, mais elle a donné au projet une forme plus maîtrisable.
+
+\subsection{Passer d'une simulation à un jeu}
+
+Une autre difficulté de conception a été de transformer une simulation autonome en jeu. Au début, nous avions tendance à ajouter des règles parce qu'elles rendaient le monde plus vivant. Le problème est qu'un monde vivant n'est pas automatiquement un jeu : le joueur peut rester spectateur. Nous avons contourné ce problème en ajoutant une boucle plus explicite : observer, gagner des points, placer un outil, attendre le bon moment, puis assumer les conséquences sur les populations. Les conditions de victoire et de défaite ont aussi été importantes, car elles donnent un cadre mesurable à l'action du joueur.
+
+Le système de quêtes prévu dans le document initial aurait pu encourager cette boucle, par exemple en récompensant des morts par épuisement, des ressources pourries ou des seuils d'extinction. Nous ne l'avons pas implémenté complètement, mais il a inspiré l'idée de récompenser les éliminations par des points et de rendre les événements visibles dans l'interface.
+
+\subsection{Équilibrage}
+
+L'équilibrage a demandé plusieurs ajustements parce que les systèmes sont fortement couplés. Augmenter la duplication des blobs ne rend pas seulement les blobs plus nombreux : cela nourrit les aliens, accélère leur survie, charge le rendu 3D et modifie la difficulté du joueur. À l'inverse, rendre les aliens trop agressifs détruit les blobs trop vite et produit une partie peu intéressante. Nous avons donc préféré une configuration centralisée et facilement modifiable, même si cela signifie que l'équilibrage reste empirique.
+
+Cette difficulté était déjà présente dans l'idée initiale avec le cycle pluie/soleil. Trop de pluie ou trop de soleil devait empêcher les graines de devenir des carottes, donc affamer les cochons, puis affamer les humains. Nous avons remplacé cette chaîne par une chaîne plus courte, aliens/blobs/plantes, mais le même problème demeure : une petite variation de paramètre peut déséquilibrer toute la partie.
+
+\subsection{Cohérence des occupations}
+
+Les entités sont stockées dans des \texttt{Map}, mais les collisions s'appuient sur des \texttt{Set}. Cette double représentation peut devenir incohérente si une entité se déplace, se fait manger ou meurt sur une plante poison pendant le même tick. Nous avons rencontré ce type de bug : une case pouvait rester marquée comme occupée alors que l'entité n'existait plus, ou l'inverse. La solution retenue a été de reconstruire régulièrement les sets d'occupation depuis les maps au début du tick principal. Ce n'est pas la solution la plus élégante théoriquement, mais elle est robuste, facile à vérifier, et adaptée à la taille du projet.
+
+\subsection{Rendu et lisibilité}
+
+Le rendu 3D a posé des problèmes de lisibilité : taille de la carte, distance caméra, taille des entités, quantité de décor. Le décor devait donner une impression de vraie carte sans masquer les agents. Nous avons donc ajouté progressivement des repères larges, des formes au sol et des assets reconnaissables. La difficulté était aussi technique : une entité logique sur une grille ne correspond pas naturellement à un objet 3D animé. Il faut créer, déplacer et supprimer les meshes au bon moment, sans accumuler d'objets morts dans la scène.
+
+\subsection{Renommage et cohérence du domaine}
+
+Le projet a changé plusieurs fois de vocabulaire. Les noms initiaux étaient pratiques pour prototyper, mais peu cohérents avec le jeu final. Le renommage vers aliens, blobs et plantes a demandé une restructuration des fichiers et des modules. Cette étape était plus coûteuse qu'un simple remplacement de texte, parce qu'il fallait éviter de casser les systèmes déjà en place. Elle était néanmoins nécessaire pour que le code, l'interface et la direction artistique racontent le même jeu.
+
+\subsection{Abandonner certains systèmes prévus}
+
+Certains éléments du document initial n'ont pas été développés jusqu'au bout : héritage des statistiques, mutations, altruisme, cycle pluie/soleil complet, quêtes, succès et courbes de caractéristiques. La difficulté ici n'était pas technique au sens strict ; elle était surtout liée à la priorisation. Chaque ajout aurait demandé du temps de développement, du debug, de l'interface et de l'équilibrage.
+
+Nous avons préféré terminer une version cohérente avec moins de systèmes, plutôt qu'une version plus proche du document initial mais instable. Cette décision explique plusieurs choix finaux : les statistiques existent surtout comme compteurs de population, les actions joueur sont directes, et les comportements d'agents sont à règles plutôt qu'à apprentissage ou évolution génétique.
+
+\section{Choix techniques justifiés}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{p{0.28\linewidth} p{0.32\linewidth} p{0.32\linewidth}}
+\toprule
+Choix & Justification & Limite \\
+\midrule
+Grille discrète & Déplacements simples, collisions lisibles, simulation stable & Moins naturel qu'un déplacement continu \\
+Maps + Sets & Accès rapide aux entités et cases occupées pendant chaque tick & Risque d'incohérence entre état logique et occupation \\
+Babylon.js & Rendu 3D Web adapté à une démonstration interactive & Complexité caméra/assets/lumières et synchronisation des meshes \\
+Agents à règles & Comportements explicables, réglables et observables & Moins adaptatif qu'une approche par apprentissage \\
+Config centralisée & Équilibrage rapide pendant les tests de partie & Fichier qui devient sensible car beaucoup de paramètres interagissent \\
+Shop + cooldowns & Transforme l'observation en décisions joueur & Demande beaucoup de réglage pour éviter le spam ou l'impuissance \\
+Réduction du scope & Permet de livrer une boucle jouable complète & Plusieurs idées initiales restent au stade de conception \\
+\bottomrule
+\end{tabular}
+\caption{Résumé des principaux choix techniques.}
+\end{table}
+
+\section{Points dont nous sommes fiers}
+
+Le point dont nous sommes le plus fiers est d'avoir transformé progressivement un prototype technique en jeu jouable. Au départ, il s'agissait essentiellement d'entités qui se déplaçaient sur une grille. À la fin, le projet contient une boucle complète : agents autonomes, prédation, duplication, outils joueur, économie de points, cooldowns, victoire, défaite, audio, interface et rendu 3D. Cette progression représente une vraie quantité de travail, car chaque ajout devait rester compatible avec la simulation existante.
+
+Nous sommes aussi fiers d'avoir gardé une filiation claire avec l'idée de départ malgré la réduction du scope. Le projet final ne contient pas tous les systèmes imaginés dans le document initial, mais il conserve son intention principale : un monde autonome, des populations interdépendantes, et un joueur qui agit indirectement sur leur équilibre. Cette continuité était importante pour nous, parce qu'elle évite que la version finale ressemble à un autre jeu sans rapport avec l'idée de base.
+
+Un autre point important est d'avoir assumé la complexité de la simulation au lieu de la masquer. Les aliens ne sont pas de simples objets à tuer : ils ont de l'énergie, une perception, une mémoire courte, une capacité de duplication et une relation avec les blobs. Les blobs ne sont pas seulement des ressources : ils fuient, se déplacent, se dupliquent et peuvent être attirés par les plantes poison. Les mutants ajoutent une troisième dynamique : immortels, ils chassent les aliens normaux et créent des situations inattendues où le joueur peut se retrouver à vouloir protéger ce qu'il cherchait à éliminer. Ces règles restent simples séparément, mais leur combinaison produit un comportement global plus riche que ce que nous avions au début.
+
+Nous sommes fiers de la restructuration finale. Le projet a évolué vite et aurait pu devenir difficile à maintenir. Le découpage actuel permet de comprendre où se trouvent les responsabilités principales : simulation, rendu, interface, audio et état de jeu. Cette organisation nous a permis de continuer à ajouter des éléments visibles tout en gardant un code modifiable.
+
+Enfin, le passage à une identité extraterrestre est une réussite importante du projet. Ce choix a rendu le jeu plus cohérent, mais il lui a aussi donné une personnalité propre. Les mécaniques de duplication, de blobs, de plantes poison et de frappe de zone fonctionnent mieux dans cet univers que dans une simulation terrestre réaliste. C'est à ce moment que le projet a cessé d'être seulement un exercice technique et a commencé à porter une intention de jeu identifiable.
+
+\section{Limites connues}
+
+Le projet conserve plusieurs limites :
+
+\begin{itemize}[noitemsep]
+  \item le pathfinding reste simple ;
+  \item les comportements sont basés sur règles, pas sur apprentissage ;
+  \item l'équilibrage peut encore être amélioré ;
+  \item certains décors ne sont pas encore intégrés à la logique de collision ;
+  \item les tests sont surtout manuels et visuels ;
+  \item le rendu dépend de la lisibilité des assets et de la caméra.
+\end{itemize}
+
+Ces limites sont connues et assumées. Elles correspondent surtout au temps disponible et au choix de prioriser une boucle jouable complète plutôt qu'une simulation parfaite. Avec plus de temps, nous aurions surtout travaillé le pathfinding, l'intégration des obstacles dans la logique de collision, et un équilibrage plus systématique basé sur plusieurs séries de parties.
+
+\section{Conclusion}
+
+\emph{Exoplanet God Mode} est le résultat d'une évolution progressive : un monde 2D, puis une simulation d'agents, puis une scène 3D, puis un jeu God Mode avec objectif. Les décisions techniques ont été guidées par la stabilité, la lisibilité et le temps disponible, mais aussi par l'idée initiale du projet : faire un jeu où le joueur ne contrôle pas une unité, mais intervient sur un écosystème autonome.
+
+Le point central du projet est l'interaction entre règles locales et intervention du joueur. Les aliens et les blobs suivent leurs propres comportements, tandis que le joueur agit par outils indirects. Le jeu final n'est pas la simulation biologique complète imaginée au départ, et il ne prétend pas l'être. C'est une version resserrée de cette ambition : moins de systèmes, mais une boucle jouable complète, construite à partir d'arbitrages concrets entre complexité, lisibilité et temps de développement.
+
+\appendix
+
+\section{Contrôles}
+
+\begin{itemize}[noitemsep]
+  \item \texttt{Espace} : pause / reprise.
+  \item \texttt{1}, \texttt{2}, \texttt{3} : vitesse de simulation.
+  \item Clic selon le mode choisi : caméra ou placement d'outil.
+  \item Clic droit : annuler l'outil sélectionné.
+\end{itemize}
+
+\section{Historique de commits significatifs}
+
+\begin{itemize}[noitemsep]
+  \item \texttt{4014476} : initialisation du monde 2D borné.
+  \item \texttt{738454e} : première boucle de comportement agent.
+  \item \texttt{92631ea} : reproduction initiale.
+  \item \texttt{6ca3ebc} : duplication à la place de la reproduction.
+  \item \texttt{1d57397} : graphique population / jours.
+  \item \texttt{3b527d0} : ajout de la seconde population.
+  \item \texttt{f23110a} : premier rendu 3D.
+  \item \texttt{1ef3f50} : corrections de bugs.
+  \item \texttt{ad6362d} : amélioration de la carte.
+  \item \texttt{a8f1009} : assets et animations.
+  \item \texttt{22a7b59} : audio.
+  \item \texttt{2dbd446} : modification de l'objectif.
+  \item \texttt{e4dc4c5} : nettoyage et restructuration.
+\end{itemize}
+
+\end{document}

@@ -25,6 +25,16 @@ export function createPopulationChart() {
         borderWidth: 1.5,
         fill: false,
       },
+      {
+        label: "Mutants",
+        data: [],
+        tension: 0.3,
+        borderColor: "rgb(255, 110, 40)",
+        backgroundColor: "rgba(255, 110, 40, 0.10)",
+        pointRadius: 0,
+        borderWidth: 1.5,
+        fill: false,
+      },
     ],
   };
 
@@ -59,10 +69,11 @@ export function createPopulationChart() {
   });
 
   return {
-    pushPoint(tick, nAliens, nBlobs) {
+    pushPoint(tick, nAliens, nBlobs, nAliens2 = 0) {
       data.labels.push(tick);
       data.datasets[0].data.push(nAliens);
       data.datasets[1].data.push(nBlobs);
+      data.datasets[2].data.push(nAliens2);
       chart.update("none");
     },
     keepLast(maxPoints) {

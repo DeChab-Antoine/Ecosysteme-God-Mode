@@ -12,11 +12,10 @@ export function makeBlob(world, x, y, template) {
     x,
     y,
     type: "blob",
-    valE:                 template.valE,               // énergie donnée à l'alien qui le mange
-    age:                  template.age  ?? 0,
-    lifespan:             template.lifespan,
-    duplicationTick:      template.duplicationTick      ?? 0,
-    duplicationTickDelay: template.duplicationTickDelay,
+    valE:              template.valE,
+    age:               template.age ?? 0,
+    lifespan:          template.lifespan,
+    duplicationChance: template.duplicationChance ?? 0,
   });
 }
 
@@ -67,12 +66,24 @@ function findNearestAlienThreat(world, blob) {
   return best;
 }
 
+function findTouchedPoisonPlant(world, entity) {
+  for (const plant of world.poisonPlants.values()) {
+    const dx = Math.abs(entity.x - plant.x);
+    const dy = Math.abs(entity.y - plant.y);
+    if (dx <= 1 && dy <= 1) return plant;
+  }
+  return null;
+}
+
 // =========================
-// Duplication — timer pur, sans énergie
+// Duplication — probabiliste, sans énergie
 // Plafond global pour éviter l'explosion si les aliens disparaissent.
 // =========================
 
 export function tryDuplicate(world, parent) {
+  if (!Number.isFinite(parent.duplicationChance)) return false;
+  const chance = Math.max(0, Math.min(1, parent.duplicationChance));
+  if (world.rand() >= chance) return false;
   if (world.blobs.size >= world.maxBlobs) return false;
   const spot = findFreeNeighborCell(world, parent.x, parent.y);
   if (!spot) return false;
@@ -81,8 +92,7 @@ export function tryDuplicate(world, parent) {
     valE:                 parent.valE,
     age:                  0,
     lifespan:             parent.lifespan,
-    duplicationTick:      0,
-    duplicationTickDelay: parent.duplicationTickDelay,
+    duplicationChance:    parent.duplicationChance,
   });
   world.occupiedBlobs.add(cellKey(world, spot.x, spot.y));
   return true;
@@ -100,34 +110,27 @@ export function updateBlobDay(world, blob) {
   }
 
   blob.age++;
-  blob.duplicationTick++;
 
-  // Priorité 1 : plante poison dans le rayon d'attraction (attirante mais mortelle)
-  const poisonTarget = findNearestPoisonPlant(world, blob);
-  if (poisonTarget) {
-    stepTowards(world, blob, poisonTarget.x, poisonTarget.y);
+  const threat = findNearestAlienThreat(world, blob);
+  if (threat) {
+    const fleeX = blob.x + Math.sign(blob.x - threat.x) * 3;
+    const fleeY = blob.y + Math.sign(blob.y - threat.y) * 3;
+    stepTowards(world, blob, fleeX, fleeY);
   } else {
-    // Priorité 2 : fuite devant les aliens
-    const threat = findNearestAlienThreat(world, blob);
-    if (threat) {
-      const fleeX = blob.x + Math.sign(blob.x - threat.x) * 3;
-      const fleeY = blob.y + Math.sign(blob.y - threat.y) * 3;
-      stepTowards(world, blob, fleeX, fleeY);
+    const poisonTarget = findNearestPoisonPlant(world, blob);
+    if (poisonTarget) {
+      stepTowards(world, blob, poisonTarget.x, poisonTarget.y);
     } else {
       wanderStep(world, blob);
     }
   }
 
-  // Duplication par timer pur (indépendante de l'énergie)
-  if (blob.duplicationTick >= blob.duplicationTickDelay) {
-    tryDuplicate(world, blob);
-    blob.duplicationTick = 0;
-  }
+  // Duplication probabiliste, indépendante de l'énergie.
+  tryDuplicate(world, blob);
 
-  // Contact avec une plante poison → mort instantanée
-  const key = cellKey(world, blob.x, blob.y);
-  if (world.occupiedPoisonPlants.has(key) && world.poisonPlants.has(key)) {
-    removePoisonPlantAt(world, blob.x, blob.y);
+  const touchedPoison = findTouchedPoisonPlant(world, blob);
+  if (touchedPoison) {
+    removePoisonPlantAt(world, touchedPoison.x, touchedPoison.y);
     world.poisonKillEvents.push({ type: "blob", x: blob.x, y: blob.y });
     removeBlobAt(world, blob);
   }

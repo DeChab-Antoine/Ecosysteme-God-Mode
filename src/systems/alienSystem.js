@@ -1,19 +1,26 @@
-import { removePoisonPlantAt, removeBlobAt, cellKey, dist2, clamp, findFreeNeighborCell } from "./worldOps.js";
+import { removePoisonPlantAt, removeRagePlantAt, removeBlobAt, cellKey, dist2, clamp, findFreeNeighborCell } from "./worldOps.js";
 import { makeAlien } from "./alienSpawnSystem.js";
+import { makeAlien2 } from "./alien2System.js";
 import { stepTowards, wanderStep } from "./movementUtils.js";
 
-const PURSUIT_MEMORY_TICKS  = 40; // ticks pendant lesquels l'alien poursuit une dernière position connue
-const POISON_ATTRACT_RADIUS = 10; // rayon d'attraction vers les plantes poison (priorité absolue)
-
-// =========================
-// Perception — avec priorité selon la faim et les plantes poison
-// =========================
+const PURSUIT_MEMORY_TICKS  = 40;
+const POISON_ATTRACT_RADIUS = 10;
+const RAGE_ATTRACT_RADIUS   = 15;
 
 function findBestTarget(world, alien) {
   const blobR2   = alien.R * alien.R;
+  const rageR2   = RAGE_ATTRACT_RADIUS * RAGE_ATTRACT_RADIUS;
   const poisonR2 = POISON_ATTRACT_RADIUS * POISON_ATTRACT_RADIUS;
 
-  // Plantes poison — priorité absolue dans le rayon 10
+  // Priorité 1 : plante rage (transformation)
+  let bestRage = null, bestRageD2 = Infinity;
+  for (const p of world.ragePlants.values()) {
+    const d2 = dist2(alien.x, alien.y, p.x, p.y);
+    if (d2 <= rageR2 && d2 < bestRageD2) { bestRageD2 = d2; bestRage = p; }
+  }
+  if (bestRage) return bestRage;
+
+  // Priorité 2 : plante poison
   let bestPoison = null, bestPoisonD2 = Infinity;
   for (const p of world.poisonPlants.values()) {
     const d2 = dist2(alien.x, alien.y, p.x, p.y);
@@ -21,8 +28,7 @@ function findBestTarget(world, alien) {
   }
   if (bestPoison) return bestPoison;
 
-  // Blobs — dans le rayon de vision alien
-  const hungry = alien.E < alien.Emax * 0.6;
+  // Priorité 3 : blob
   let bestBlob = null, bestBlobD2 = Infinity;
   for (const p of world.blobs.values()) {
     const d2 = dist2(alien.x, alien.y, p.x, p.y);
@@ -31,42 +37,56 @@ function findBestTarget(world, alien) {
   return bestBlob;
 }
 
+function findTouchedPoisonPlant(world, entity) {
+  for (const plant of world.poisonPlants.values()) {
+    const dx = Math.abs(entity.x - plant.x);
+    const dy = Math.abs(entity.y - plant.y);
+    if (dx <= 1 && dy <= 1) return plant;
+  }
+  return null;
+}
+
+function findTouchedRagePlant(world, entity) {
+  for (const plant of world.ragePlants.values()) {
+    const dx = Math.abs(entity.x - plant.x);
+    const dy = Math.abs(entity.y - plant.y);
+    if (dx <= 1 && dy <= 1) return plant;
+  }
+  return null;
+}
+
 // =========================
 // Reproduction
 // =========================
 
-function canDuplicate(alien) {
+function canDuplicate(world, alien) {
   return (
     Number.isFinite(alien.E) &&
     Number.isFinite(alien.Emax) &&
-    alien.duplicationTick >= alien.duplicationTickDelay &&
-    alien.E >= alien.Emax * 0.95
+    alien.E >= alien.Emax * 0.95 &&
+    world.rand() < alien.duplicationChance
   );
 }
 
 function createChildTemplate(parent) {
   return {
-    E:                    parent.Emax,
-    Emax:                 parent.Emax,
-    energyDecayPerTick:   parent.energyDecayPerTick,
-    R:                    parent.R,
-    age:                  0,
-    lifespan:             parent.lifespan,
-    duplicationCost:      parent.duplicationCost,
-    duplicationTick:      0,
-    duplicationTickDelay: parent.duplicationTickDelay,
+    E:                  parent.Emax,
+    Emax:               parent.Emax,
+    energyDecayPerTick: parent.energyDecayPerTick,
+    R:                  parent.R,
+    age:                0,
+    lifespan:           parent.lifespan,
+    duplicationCost:    parent.duplicationCost,
+    duplicationChance:  parent.duplicationChance,
   };
 }
 
 export function tryDuplicate(world, parent) {
   const spot = findFreeNeighborCell(world, parent.x, parent.y);
   if (!spot) return false;
-
   makeAlien(world, spot.x, spot.y, createChildTemplate(parent));
   world.occupiedAliens.add(cellKey(world, spot.x, spot.y));
-
   parent.E = clamp(parent.E - parent.duplicationCost, 0, parent.Emax);
-  parent.duplicationTick = 0;
   return true;
 }
 
@@ -80,45 +100,54 @@ export function updateAlienDay(world, alien) {
 
   alien.E -= alien.energyDecayPerTick;
   alien.age++;
-  alien.duplicationTick++;
 
   const wellFed = alien.E > alien.Emax * 0.8;
   const target  = findBestTarget(world, alien);
 
   if (target) {
-    // Met à jour la mémoire uniquement pour les blobs (mobiles)
     if (target.type === "blob") {
       alien.memory = { x: target.x, y: target.y, tick: world.tick };
     }
     stepTowards(world, alien, target.x, target.y);
-
   } else if (!wellFed && alien.memory && (world.tick - alien.memory.tick) < PURSUIT_MEMORY_TICKS) {
-    // Poursuite vers la dernière position connue d'un blob
     stepTowards(world, alien, alien.memory.x, alien.memory.y);
     if (alien.x === alien.memory.x && alien.y === alien.memory.y) alien.memory = null;
-
   } else {
-    // Errance (rassasié ou mémoire expirée) : waypoint global
     alien.memory = null;
     wanderStep(world, alien);
   }
 
-  if (canDuplicate(alien)) tryDuplicate(world, alien);
+  if (canDuplicate(world, alien)) tryDuplicate(world, alien);
 
   const key = cellKey(world, alien.x, alien.y);
 
-  // Vérifier si l'alien marche sur une plante poison → mort instantanée
-  if (world.occupiedPoisonPlants.has(key)) {
-    if (world.poisonPlants.has(key)) {
-      removePoisonPlantAt(world, alien.x, alien.y);
-      world.poisonKillEvents.push({ type: "alien", x: alien.x, y: alien.y });
-      world.occupiedAliens.delete(key);
-      world.aliens.delete(alien.id);
-      return;
-    }
+  // Plante rage → transformation en alien2
+  const touchedRage = findTouchedRagePlant(world, alien);
+  if (touchedRage) {
+    removeRagePlantAt(world, touchedRage.x, touchedRage.y);
+    world.transformEvents.push({ alienId: alien.id, x: alien.x, y: alien.y });
+    world.occupiedAliens.delete(key);
+    world.aliens.delete(alien.id);
+    makeAlien2(world, alien.x, alien.y, {
+      E:    alien.Emax,
+      Emax: alien.Emax,
+      R:    alien.R * 1.5,
+    });
+    world.occupiedAliens2.add(key);
+    return;
   }
 
-  // Manger un blob si on est sur la même case
+  // Plante poison → mort instantanée
+  const touchedPoison = findTouchedPoisonPlant(world, alien);
+  if (touchedPoison) {
+    removePoisonPlantAt(world, touchedPoison.x, touchedPoison.y);
+    world.poisonKillEvents.push({ type: "alien", x: alien.x, y: alien.y });
+    world.occupiedAliens.delete(key);
+    world.aliens.delete(alien.id);
+    return;
+  }
+
+  // Manger un blob sur la même case
   if (world.occupiedBlobs.has(key) && alien.E < alien.Emax) {
     for (const p of world.blobs.values()) {
       if (p.x === alien.x && p.y === alien.y) {
