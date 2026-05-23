@@ -17,10 +17,12 @@ export function createViewState() {
     speedMultiplier: 1,
     forceNight: false,
     points: 10,
-    selectedShopItem: null,   // "poisonPlant" | null
+    selectedShopItem: null,   // "poisonPlant" | "nuke" | null
     gameOver: false,
     cameraMode: true,         // true = clic gauche orbite | false = clic gauche place
-    _alienCount: 0,           // cache mis à jour chaque tick pour shopBar
+    _alienCount: 0,           // caches mis à jour chaque tick pour shopBar
+    _tick: 0,
+    cooldownUntilTick: {},    // { poisonPlant: N, nuke: N } — tick d'expiration du cooldown
 
     // =========================
     // Paramétrage centralisé
@@ -85,6 +87,11 @@ export function createViewState() {
         startingPoints: 10,
         costs: {
           poisonPlant: 5,
+          nuke:        30,
+        },
+        cooldownTicks: {
+          poisonPlant: 20,   // 2s à ×1 — évite le spam mais reste fluide
+          nuke:        300,  // 30s à ×1 — arme lourde, cooldown significatif
         },
         winAliens:  0,
         loseAliens: 100,

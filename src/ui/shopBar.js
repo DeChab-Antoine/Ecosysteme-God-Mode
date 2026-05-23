@@ -1,22 +1,23 @@
 export function createShopBar(viewState, onCameraToggle) {
-  const cards = document.querySelectorAll(".shop-card");
-  const pointsEl = document.getElementById("pointsDisplay");
+  const cards       = document.querySelectorAll(".shop-card");
+  const pointsEl    = document.getElementById("pointsDisplay");
   const alienCountEl = document.getElementById("alienCount");
-  const cameraBtnEl = document.getElementById("cameraModeBtn");
-  const costs = viewState.config.shop.costs;
+  const cameraBtnEl  = document.getElementById("cameraModeBtn");
+  const costs        = viewState.config.shop.costs;
 
   // Clic sur une carte entité
   cards.forEach((card) => {
     card.addEventListener("click", () => {
-      const entity = card.dataset.entity;
-      if (viewState.points < costs[entity]) return;
+      const entity    = card.dataset.entity;
+      const tick      = viewState._tick ?? 0;
+      const onCooldown = tick < (viewState.cooldownUntilTick?.[entity] ?? 0);
+
+      if (viewState.points < costs[entity] || onCooldown) return;
 
       if (viewState.selectedShopItem === entity) {
-        // Déselect → retour mode caméra
         viewState.selectedShopItem = null;
         viewState.cameraMode = true;
       } else {
-        // Sélection → mode placement automatique
         viewState.selectedShopItem = entity;
         viewState.cameraMode = false;
       }
@@ -29,9 +30,7 @@ export function createShopBar(viewState, onCameraToggle) {
   if (cameraBtnEl) {
     cameraBtnEl.addEventListener("click", () => {
       viewState.cameraMode = !viewState.cameraMode;
-      if (viewState.cameraMode) {
-        viewState.selectedShopItem = null;
-      }
+      if (viewState.cameraMode) viewState.selectedShopItem = null;
       onCameraToggle(viewState.cameraMode);
       refresh();
     });
@@ -48,15 +47,43 @@ export function createShopBar(viewState, onCameraToggle) {
   });
 
   function refresh() {
-    const pts = Math.floor(viewState.points);
+    const pts  = Math.floor(viewState.points);
+    const tick = viewState._tick ?? 0;
+
     if (pointsEl) pointsEl.textContent = pts;
 
-    // Cartes entités
     cards.forEach((card) => {
-      const entity = card.dataset.entity;
-      const canAfford = pts >= costs[entity];
-      card.classList.toggle("disabled", !canAfford);
-      card.classList.toggle("selected", viewState.selectedShopItem === entity);
+      const entity    = card.dataset.entity;
+      const cdUntil   = viewState.cooldownUntilTick?.[entity] ?? 0;
+      const remaining = Math.max(0, cdUntil - tick);
+      const onCooldown = remaining > 0;
+      const canAfford  = pts >= costs[entity] && !onCooldown;
+
+      card.classList.toggle("disabled",  !canAfford);
+      card.classList.toggle("selected",  viewState.selectedShopItem === entity && !onCooldown);
+
+      // Si on est en cooldown avec cet item sélectionné, on désélectionne
+      if (onCooldown && viewState.selectedShopItem === entity) {
+        viewState.selectedShopItem = null;
+        viewState.cameraMode = true;
+        onCameraToggle(true);
+      }
+
+      // Overlay de cooldown
+      let overlay = card.querySelector(".shop-cooldown");
+      if (onCooldown) {
+        if (!overlay) {
+          overlay = document.createElement("div");
+          overlay.className = "shop-cooldown";
+          overlay.innerHTML =
+            `<span class="shop-cooldown-num"></span>` +
+            `<span class="shop-cooldown-lbl">CD</span>`;
+          card.appendChild(overlay);
+        }
+        overlay.querySelector(".shop-cooldown-num").textContent = remaining;
+      } else if (overlay) {
+        overlay.remove();
+      }
     });
 
     // Curseur canvas
@@ -74,10 +101,8 @@ export function createShopBar(viewState, onCameraToggle) {
         : "Mode placement actif — clic gauche pour poser";
     }
 
-    // Compteur d'aliens restants
-    if (alienCountEl) {
-      alienCountEl.textContent = viewState._alienCount ?? 0;
-    }
+    // Compteur aliens
+    if (alienCountEl) alienCountEl.textContent = viewState._alienCount ?? 0;
   }
 
   return { refresh };

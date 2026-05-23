@@ -28,7 +28,8 @@ export function createWorld({ gridW, gridH, dayTicks, nightTicks, seed }) {
     nextBlobId: 1,
     maxBlobs: 120,  // injecté depuis config au démarrage
 
-    // Événements de kills par poison (lus et vidés chaque tick par main.js)
+    // Événements de kills (lus et vidés par le renderer/main.js)
     poisonKillEvents: [],
+    nukeEvents: [],       // { x, y, radius } — produits par l'action Frappe du joueur
   };
 }

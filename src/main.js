@@ -3,8 +3,8 @@ import { mulberry32 } from "./rng.js";
 import { createRenderer } from "./renderers/createRenderer.js";
 import { createViewState } from "./viewState.js";
 import { spawnPoisonPlantAt } from "./systems/plantSystem.js";
-import { spawnInitialAliens, makeAlien } from "./systems/alienSpawnSystem.js";
-import { spawnInitialBlobs, makeBlob, updateBlobDay } from "./systems/blobSystem.js";
+import { spawnInitialAliens } from "./systems/alienSpawnSystem.js";
+import { spawnInitialBlobs, updateBlobDay } from "./systems/blobSystem.js";
 import { updateAlienDay } from "./systems/alienSystem.js";
 import { createPopulationChart } from "./ui/populationChart.js";
 import { cellKey } from "./systems/worldOps.js";
@@ -16,8 +16,8 @@ import { createWinLoseScreen } from "./ui/winLoseScreen.js";
 // =========================
 // Eléments DOM
 // =========================
-const canvas = document.getElementById("game");
-const eventLogEl = document.getElementById("eventLog");
+const canvas      = document.getElementById("game");
+const eventLogEl  = document.getElementById("eventLog");
 const speedBadgeEl = document.getElementById("speedBadge");
 const pauseBadgeEl = document.getElementById("pauseBadge");
 const phaseLabelEl = document.getElementById("phaseLabel");
@@ -27,31 +27,33 @@ const countBlobsEl  = document.getElementById("countBlobs");
 // =========================
 // Etat de vue + config centralisée
 // =========================
-const viewState = createViewState();
-const SHOP_COSTS  = viewState.config.shop.costs;
-const WIN_ALIENS  = viewState.config.shop.winAliens;
-const LOSE_ALIENS = viewState.config.shop.loseAliens;
-const GRACE_TICKS = viewState.config.shop.graceTicks;
+const viewState   = createViewState();
+const SHOP_COSTS      = viewState.config.shop.costs;
+const SHOP_COOLDOWNS  = viewState.config.shop.cooldownTicks;
+const WIN_ALIENS      = viewState.config.shop.winAliens;
+const LOSE_ALIENS     = viewState.config.shop.loseAliens;
+const GRACE_TICKS     = viewState.config.shop.graceTicks;
+const NUKE_RADIUS     = 10;
 
 // =========================
 // Création du monde
 // =========================
 const world = createWorld({
-  gridW: viewState.config.world.gridW,
-  gridH: viewState.config.world.gridH,
-  dayTicks: viewState.config.world.dayTicks,
+  gridW:      viewState.config.world.gridW,
+  gridH:      viewState.config.world.gridH,
+  dayTicks:   viewState.config.world.dayTicks,
   nightTicks: viewState.config.world.nightTicks,
   seed: crypto.getRandomValues(new Uint32Array(1))[0],
 });
 
-world.rand = mulberry32(world.seed);
+world.rand     = mulberry32(world.seed);
 world.maxBlobs = viewState.config.initialBlobs.maxBlobs;
 
 // =========================
 // Renderer + audio
 // =========================
 const renderer = createRenderer(canvas, world, viewState);
-const audio = createAudioManager();
+const audio    = createAudioManager();
 
 // =========================
 // Spawn initial
@@ -60,9 +62,9 @@ spawnInitialAliens(world, viewState.config.initialAliens);
 spawnInitialBlobs(world, viewState.config.initialBlobs);
 
 // =========================
-// Graphes de population
+// Graphe de population
 // =========================
-const MAX_POINTS = 300;
+const MAX_CHART_POINTS = 300;
 const popChart = createPopulationChart();
 
 // =========================
@@ -74,9 +76,7 @@ function logEvent(msg) {
   eventMessages.unshift(msg);
   if (eventMessages.length > 7) eventMessages.pop();
   if (eventLogEl) {
-    eventLogEl.innerHTML = eventMessages
-      .map((m) => `<div class="evt">${m}</div>`)
-      .join("");
+    eventLogEl.innerHTML = eventMessages.map((m) => `<div class="evt">${m}</div>`).join("");
   }
 }
 
@@ -87,36 +87,74 @@ function updateStatsUI(phase) {
   const isNight = phase.name === "NIGHT";
   if (phaseLabelEl) {
     phaseLabelEl.textContent = isNight ? `Nuit — Jour ${world.day}` : `Jour ${world.day}`;
-    phaseLabelEl.className = isNight ? "night" : "";
+    phaseLabelEl.className   = isNight ? "night" : "";
   }
   if (countAliensEl) countAliensEl.textContent = world.aliens.size;
   if (countBlobsEl)  countBlobsEl.textContent  = world.blobs.size;
-  if (speedBadgeEl)  speedBadgeEl.textContent   = `×${viewState.speedMultiplier}`;
-  if (pauseBadgeEl)  pauseBadgeEl.style.display  = viewState.paused ? "inline-block" : "none";
+  if (speedBadgeEl)  speedBadgeEl.textContent  = `×${viewState.speedMultiplier}`;
+  if (pauseBadgeEl)  pauseBadgeEl.style.display = viewState.paused ? "inline-block" : "none";
 }
 
 // =========================
 // Phase jour / nuit
 // =========================
 function getPhase() {
-  if (viewState.forceNight) {
-    return { name: "NIGHT", tInPhase: 0, duration: 1 };
-  }
+  if (viewState.forceNight) return { name: "NIGHT", tInPhase: 0, duration: 1 };
   const cycle = world.dayTicks + world.nightTicks;
   const t = world.tick % cycle;
-  if (t < world.dayTicks) {
-    return { name: "DAY", tInPhase: t, duration: world.dayTicks };
-  }
-  return { name: "NIGHT", tInPhase: t - world.dayTicks, duration: world.nightTicks };
+  if (t < world.dayTicks) return { name: "DAY",   tInPhase: t,                  duration: world.dayTicks };
+  return                         { name: "NIGHT", tInPhase: t - world.dayTicks, duration: world.nightTicks };
 }
 
 // =========================
-// Placement de plante poison via shop
+// Actions joueur
 // =========================
 function tryPlacePoisonPlant(x, y) {
   const gx = Math.max(0, Math.min(world.gridW - 1, x));
   const gy = Math.max(0, Math.min(world.gridH - 1, y));
   return spawnPoisonPlantAt(world, gx, gy);
+}
+
+function fireNukeAt(x, y) {
+  const r2 = NUKE_RADIUS * NUKE_RADIUS;
+  let aliensKilled = 0;
+  let blobsKilled  = 0;
+
+  for (const [id, alien] of world.aliens.entries()) {
+    const dx = alien.x - x, dy = alien.y - y;
+    if (dx * dx + dy * dy <= r2) {
+      world.occupiedAliens.delete(cellKey(world, alien.x, alien.y));
+      world.aliens.delete(id);
+      aliensKilled++;
+    }
+  }
+
+  for (const [id, blob] of world.blobs.entries()) {
+    const dx = blob.x - x, dy = blob.y - y;
+    if (dx * dx + dy * dy <= r2) {
+      world.occupiedBlobs.delete(cellKey(world, blob.x, blob.y));
+      world.blobs.delete(id);
+      blobsKilled++;
+    }
+  }
+
+  world.nukeEvents.push({ x, y, radius: NUKE_RADIUS });
+  return { aliensKilled, blobsKilled };
+}
+
+function isCoolingDown(entity) {
+  return world.tick < (viewState.cooldownUntilTick[entity] ?? 0);
+}
+
+function setCooldown(entity) {
+  viewState.cooldownUntilTick[entity] = world.tick + (SHOP_COOLDOWNS[entity] ?? 0);
+}
+
+// =========================
+// Volume audio spatialisé
+// =========================
+function vol(x, y) {
+  return renderer.getAudioVolume ? renderer.getAudioVolume(x, y) : 1;
 }
 
 // =========================
@@ -155,7 +193,7 @@ function setupKeyboard() {
 // =========================
 // Tick principal
 // =========================
-let shopBar = null;
+let shopBar      = null;
 let winLoseScreen = null;
 
 function tick() {
@@ -165,115 +203,110 @@ function tick() {
     return;
   }
 
-  // Vider les événements de kill poison du tick précédent
   world.poisonKillEvents.length = 0;
-
-  viewState._alienCount = world.aliens.size;
-  if (shopBar) shopBar.refresh();
 
   // Graphique — échantillonnage toutes les 5 ticks
   if (world.tick % 5 === 0) {
     popChart.pushPoint(world.tick, world.aliens.size, world.blobs.size);
-    popChart.keepLast(MAX_POINTS);
+    popChart.keepLast(MAX_CHART_POINTS);
   }
 
-  // Vérification victoire / défaite
-  if (!viewState.gameOver && world.tick > GRACE_TICKS) {
-    if (world.aliens.size === WIN_ALIENS) {
-      viewState.gameOver = true;
-      viewState.paused = true;
-      if (winLoseScreen) winLoseScreen.showWin();
-      audio.playDeath();
-      logEvent(`VICTOIRE — tous les aliens ont été éliminés !`);
-    } else if (world.aliens.size >= LOSE_ALIENS) {
-      viewState.gameOver = true;
-      viewState.paused = true;
-      if (winLoseScreen) winLoseScreen.showLose();
-      audio.playBirth();
-      logEvent(`DÉFAITE — les aliens ont envahi la planète (${LOSE_ALIENS}) !`);
-    }
-  }
-
-  const phase = getPhase();
+  const phase    = getPhase();
   const wasNight = viewState.isNight;
   viewState.isNight = phase.name === "NIGHT";
+  if (!wasNight && viewState.isNight) audio.playDayNight();
 
-  if (!wasNight && viewState.isNight) {
-    audio.playDayNight();
-  }
-
+  // =========================
+  // Phase Jour
+  // =========================
   if (phase.name === "DAY") {
+
+    // Mise à jour aliens
     const alienIdsBefore = new Set(world.aliens.keys());
     for (const alien of world.aliens.values()) {
       const prevAction = alien.lastAction;
       updateAlienDay(world, alien);
       if (alien.lastAction !== prevAction && alien.lastAction?.tick === world.tick) {
-        const vol = renderer.getAudioVolume ? renderer.getAudioVolume(alien.x, alien.y) : 1;
-        if (alien.lastAction.type === "eatBlob") audio.playEatBlob(vol * 0.55);
+        if (alien.lastAction.type === "eatBlob") audio.playEatBlob(vol(alien.x, alien.y) * 0.55);
       }
     }
     for (const [id, alien] of world.aliens.entries()) {
-      if (!alienIdsBefore.has(id)) {
-        const vol = renderer.getAudioVolume ? renderer.getAudioVolume(alien.x, alien.y) : 1;
-        audio.playBirth(vol * 0.45);
-      }
+      if (!alienIdsBefore.has(id)) audio.playBirth(vol(alien.x, alien.y) * 0.45);
     }
 
+    // Mise à jour blobs
     const blobIdsBefore = new Set(world.blobs.keys());
-    const movingBlobs = new Set();
+    const movingBlobs   = new Set();
     for (const [id, blob] of world.blobs.entries()) {
-      const prevX = blob.x;
-      const prevY = blob.y;
+      const prevX = blob.x, prevY = blob.y;
       updateBlobDay(world, blob);
-      const vol = renderer.getAudioVolume ? renderer.getAudioVolume(blob.x, blob.y) : 1;
       if (blob.x !== prevX || blob.y !== prevY) {
         movingBlobs.add(id);
-        audio.startBlobStep(id, vol * 0.3);
+        audio.startBlobStep(id, vol(blob.x, blob.y) * 0.3);
       }
     }
     for (const [id, blob] of world.blobs.entries()) {
-      if (!blobIdsBefore.has(id)) {
-        const vol = renderer.getAudioVolume ? renderer.getAudioVolume(blob.x, blob.y) : 1;
-        audio.playBirth(vol * 0.45);
-      }
+      if (!blobIdsBefore.has(id)) audio.playBirth(vol(blob.x, blob.y) * 0.45);
     }
     audio.stopBlobStepsExcept(movingBlobs);
 
-    // Récompenses pour les kills par poison
+    // Kills par poison — son + points
     for (const evt of world.poisonKillEvents) {
+      const v = vol(evt.x, evt.y);
       if (evt.type === "alien") {
         viewState.points += 10;
+        audio.playDeath(v * 0.7);
         logEvent(`Alien empoisonné ! (+10 pts)`);
       } else if (evt.type === "blob") {
         viewState.points += 5;
+        audio.playDeath(v * 0.4);
         logEvent(`Blob empoisonné (+5 pts)`);
       }
     }
-    if (world.poisonKillEvents.length > 0 && shopBar) shopBar.refresh();
 
+  // =========================
+  // Phase Nuit
+  // =========================
   } else {
     audio.stopAllBlobSteps();
     if (phase.tInPhase === 0) {
       let deadCount = 0;
       for (const [id, alien] of world.aliens.entries()) {
         if (alien.E <= 0) {
-          const vol = renderer.getAudioVolume ? renderer.getAudioVolume(alien.x, alien.y) : 1;
-          audio.playDeath(vol * 0.5);
-          const key = cellKey(world, alien.x, alien.y);
-          world.occupiedAliens.delete(key);
+          audio.playDeath(vol(alien.x, alien.y) * 0.5);
+          world.occupiedAliens.delete(cellKey(world, alien.x, alien.y));
           world.aliens.delete(id);
           deadCount++;
         }
       }
-      if (deadCount > 0) {
-        logEvent(`${deadCount} alien(s) ont disparu cette nuit`);
-      }
-
+      if (deadCount > 0) logEvent(`${deadCount} alien(s) ont disparu cette nuit`);
       world.day++;
     }
   }
 
+  // Vérification victoire / défaite — après toutes les mises à jour du tick
+  if (!viewState.gameOver && world.tick > GRACE_TICKS) {
+    if (world.aliens.size === WIN_ALIENS) {
+      viewState.gameOver = true;
+      viewState.paused   = true;
+      if (winLoseScreen) winLoseScreen.showWin();
+      audio.playDeath();
+      logEvent(`VICTOIRE — tous les aliens ont été éliminés !`);
+    } else if (world.aliens.size >= LOSE_ALIENS) {
+      viewState.gameOver = true;
+      viewState.paused   = true;
+      if (winLoseScreen) winLoseScreen.showLose();
+      audio.playBirth();
+      logEvent(`DÉFAITE — les aliens ont envahi la planète (${LOSE_ALIENS}) !`);
+    }
+  }
+
+  // UI — une seule passe, après toutes les modifications d'état
+  viewState._alienCount = world.aliens.size;
+  viewState._tick       = world.tick;
   updateStatsUI(phase);
+  if (shopBar) shopBar.refresh();
+
   renderer.renderWorld(world, viewState);
   world.tick++;
 }
@@ -284,21 +317,16 @@ function tick() {
 function startGame() {
   audio.resume();
   audio.startAmbient();
-
   setupKeyboard();
 
   shopBar = createShopBar(viewState, (isCameraMode) => {
     if (renderer.setCameraControl) renderer.setCameraControl(isCameraMode);
   });
   shopBar.refresh();
-  // Démarre en mode caméra (par défaut)
   if (renderer.setCameraControl) renderer.setCameraControl(true);
 
-  winLoseScreen = createWinLoseScreen(() => {
-    location.reload();
-  });
+  winLoseScreen = createWinLoseScreen(() => location.reload());
 
-  // Clic droit → annuler sélection + retour mode caméra
   canvas.addEventListener("contextmenu", (e) => {
     e.preventDefault();
     if (viewState.selectedShopItem) {
@@ -309,31 +337,38 @@ function startGame() {
     }
   });
 
-  // Clic sur terrain → placer la plante poison sélectionnée
   if (renderer.setGroundClickCallback) {
     renderer.setGroundClickCallback((x, z) => {
       const entity = viewState.selectedShopItem;
       if (!entity) return;
+
       const cost = SHOP_COSTS[entity];
       if (viewState.points < cost) return;
+      if (isCoolingDown(entity)) return;
 
-      let placed = false;
-      const spawnVol = renderer.getAudioVolume ? renderer.getAudioVolume(x, z) : 1;
-      if (entity === "poisonPlant") {
-        placed = tryPlacePoisonPlant(x, z);
-        if (placed) audio.playSpawn(spawnVol * 0.5);
+      if (entity === "poisonPlant" && tryPlacePoisonPlant(x, z)) {
+        viewState.points -= cost;
+        setCooldown("poisonPlant");
+        audio.playSpawn(vol(x, z) * 0.5);
+        logEvent(`Poison posé (-${cost} pts)`);
+        shopBar.refresh();
       }
 
-      if (placed) {
+      if (entity === "nuke") {
         viewState.points -= cost;
-        logEvent(`Poison posé en (${x}, ${z}) (-${cost} pts)`);
+        setCooldown("nuke");
+        const { aliensKilled, blobsKilled } = fireNukeAt(x, z);
+        viewState.points += aliensKilled * 10 + blobsKilled * 2;
+        audio.playDeath(vol(x, z) * 1.1);
+        const gain = aliensKilled * 10 + blobsKilled * 2 - cost;
+        const gainStr = gain >= 0 ? `+${gain}` : `${gain}`;
+        logEvent(`Frappe ! ${aliensKilled} aliens, ${blobsKilled} blobs (${gainStr} pts)`);
         shopBar.refresh();
       }
     });
   }
 
   logEvent("Bienvenue — vous êtes le Dieu de ce monde.");
-
   gameInterval = setInterval(tick, BASE_TICK_MS);
 }
 

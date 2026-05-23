@@ -1,4 +1,5 @@
-import { cellKey, dist2, clamp, moveTo, findFreeNeighborCell, removePoisonPlantAt, removeBlobAt } from "./worldOps.js";
+import { cellKey, dist2, findFreeNeighborCell, removePoisonPlantAt, removeBlobAt } from "./worldOps.js";
+import { stepTowards, wanderStep } from "./movementUtils.js";
 
 const POISON_ATTRACT_RADIUS = 10; // rayon d'attraction vers les plantes poison (priorité absolue)
 const BLOB_FEAR_RADIUS       = 8;  // rayon de détection des aliens
@@ -67,52 +68,6 @@ function findNearestAlienThreat(world, blob) {
 }
 
 // =========================
-// Mouvement
-// =========================
-
-// Avance vers (tx, ty) avec essais successifs puis fallback 4 directions mélangées.
-function stepTowards(world, entity, tx, ty) {
-  const dx = tx - entity.x;
-  const dy = ty - entity.y;
-  const sx = Math.sign(dx);
-  const sy = Math.sign(dy);
-
-  if (sx !== 0 && sy !== 0 && moveTo(world, entity, entity.x + sx, entity.y + sy)) return;
-
-  const primary = Math.abs(dx) >= Math.abs(dy)
-    ? { x: entity.x + sx, y: entity.y }
-    : { x: entity.x,      y: entity.y + sy };
-  if (moveTo(world, entity, primary.x, primary.y)) return;
-
-  const secondary = Math.abs(dx) >= Math.abs(dy)
-    ? { x: entity.x,      y: entity.y + sy }
-    : { x: entity.x + sx, y: entity.y };
-  if (moveTo(world, entity, secondary.x, secondary.y)) return;
-
-  // Bloqué : essaie les 4 cardinales en ordre aléatoire (contournement d'obstacle)
-  const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
-  for (let i = 3; i > 0; i--) {
-    const j = Math.floor(world.rand() * (i + 1));
-    [dirs[i], dirs[j]] = [dirs[j], dirs[i]];
-  }
-  for (const [ddx, ddy] of dirs) {
-    if (moveTo(world, entity, entity.x + ddx, entity.y + ddy)) return;
-  }
-}
-
-// Errance globale : se dirige vers un waypoint aléatoire sur toute la carte.
-// Quand la destination est atteinte (dist ≤ 3), en choisit une nouvelle.
-// Garantit une couverture de la carte entière, pas une zone locale.
-function wanderStep(world, entity) {
-  if (entity.wanderX === undefined ||
-      Math.abs(entity.x - entity.wanderX) + Math.abs(entity.y - entity.wanderY) <= 3) {
-    entity.wanderX = Math.floor(world.rand() * world.gridW);
-    entity.wanderY = Math.floor(world.rand() * world.gridH);
-  }
-  stepTowards(world, entity, entity.wanderX, entity.wanderY);
-}
-
-// =========================
 // Duplication — timer pur, sans énergie
 // Plafond global pour éviter l'explosion si les aliens disparaissent.
 // =========================
@@ -173,7 +128,7 @@ export function updateBlobDay(world, blob) {
   const key = cellKey(world, blob.x, blob.y);
   if (world.occupiedPoisonPlants.has(key) && world.poisonPlants.has(key)) {
     removePoisonPlantAt(world, blob.x, blob.y);
-    world.poisonKillEvents.push({ type: "blob" });
+    world.poisonKillEvents.push({ type: "blob", x: blob.x, y: blob.y });
     removeBlobAt(world, blob);
   }
 }
