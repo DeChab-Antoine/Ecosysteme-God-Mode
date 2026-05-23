@@ -1,10 +1,10 @@
-// Retire un plant nutritif si il existe sur (x,y).
-export function removePlantAt(world, x, y) {
+// Retire une plante poison si elle existe sur (x,y).
+export function removePoisonPlantAt(world, x, y) {
   const key = cellKey(world, x, y);
-  if (!world.occupiedPlants.has(key)) return false;
+  if (!world.occupiedPoisonPlants.has(key)) return false;
 
-  world.occupiedPlants.delete(key);
-  world.plants.delete(key);
+  world.occupiedPoisonPlants.delete(key);
+  world.poisonPlants.delete(key);
   return true;
 }
 
@@ -94,7 +94,7 @@ export function findFreeNeighborCell(world, x, y) {
     if (
       !world.occupiedAliens.has(k) &&
       !world.occupiedBlobs.has(k) &&
-      !world.occupiedPlants.has(k)
+      !world.occupiedPoisonPlants.has(k)
     ) {
       return { x: nx, y: ny };
     }

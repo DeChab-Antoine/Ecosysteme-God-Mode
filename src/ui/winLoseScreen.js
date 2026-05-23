@@ -11,17 +11,17 @@ export function createWinLoseScreen(onRestart) {
 
   return {
     showWin() {
-      titleEl.textContent = "VICTOIRE";
+      titleEl.textContent = "EXTERMINATION";
       titleEl.className = "win";
       msgEl.innerHTML =
-        "50 aliens dominent la planète.<br>La vie a trouvé un chemin.";
+        "Tous les aliens ont été éliminés.<br>La planète est libérée.";
       screen.style.display = "flex";
     },
     showLose() {
-      titleEl.textContent = "DÉFAITE";
+      titleEl.textContent = "INVASION";
       titleEl.className = "lose";
       msgEl.innerHTML =
-        "Tous les aliens ont disparu...<br>La planète retourne au silence.";
+        "Les aliens ont submergé la planète.<br>Vous n'avez pas pu les contenir.";
       screen.style.display = "flex";
     },
   };

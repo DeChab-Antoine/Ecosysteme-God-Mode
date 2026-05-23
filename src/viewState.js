@@ -16,8 +16,8 @@ export function createViewState() {
     paused: false,
     speedMultiplier: 1,
     forceNight: false,
-    points: 150,
-    selectedShopItem: null,   // "plant" | "blob" | "alien" | null
+    points: 10,
+    selectedShopItem: null,   // "poisonPlant" | null
     gameOver: false,
     cameraMode: true,         // true = clic gauche orbite | false = clic gauche place
     _alienCount: 0,           // cache mis à jour chaque tick pour shopBar
@@ -43,16 +43,8 @@ export function createViewState() {
         maxPoints: 3000,
       },
 
-      plants: {
-        maxPlants: 60,
-        spawnAttemptsPerTick: 5,
-        spawnChance: 1,
-        valE: 5,
-        maxAge: 500,
-      },
-
       initialAliens: {
-        count: 10,
+        count: 50,
         maxAttempts: 5000,
 
         createAlienTemplate: (world) => {
@@ -72,17 +64,14 @@ export function createViewState() {
       initialBlobs: {
         count: 16,
         maxAttempts: 5000,
+        maxBlobs: 120,       // plafond global anti-explosion
 
         createBlobTemplate: (world) => {
           return {
-            E:    15,                // énergie initiale (75% de Emax)
-            Emax: 20,
             lifespan: 1400,
-            valE: 50,
-            duplicationCost: 16,
+            valE: 50,               // énergie donnée à l'alien qui le mange
             duplicationTickDelay: 350,
             duplicationTick: 0,
-            energyDecayPerTick: 0.015,
           };
         },
       },
@@ -90,18 +79,15 @@ export function createViewState() {
       labels: {
         aliens: "Aliens",
         blobs: "Blobs",
-        plants: "Plants",
       },
 
       shop: {
-        startingPoints: 150,
-        pointsPerTick: 2,
+        startingPoints: 10,
         costs: {
-          plant: 30,
-          blob: 120,
-          alien: 350,
+          poisonPlant: 5,
         },
-        winAliens: 50,
+        winAliens:  0,
+        loseAliens: 100,
         graceTicks: 50,
       },
     },

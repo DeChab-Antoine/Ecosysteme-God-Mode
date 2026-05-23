@@ -323,10 +323,10 @@ export function createRenderer3D(canvas, { gridW, gridH, cellSize }) {
   // =========================
   // Matériaux entités
   // =========================
-  const plantMat = new BABYLON.StandardMaterial("plantMat", scene);
-  plantMat.diffuseColor = new BABYLON.Color3(0.95, 0.75, 0.25);
-  plantMat.emissiveColor = new BABYLON.Color3(0.12, 0.08, 0.02);
-  plantMat.specularColor = new BABYLON.Color3(0.28, 0.18, 0.04);
+  const plantMat = new BABYLON.StandardMaterial("poisonPlantMat", scene);
+  plantMat.diffuseColor = new BABYLON.Color3(0.1, 0.72, 0.18);
+  plantMat.emissiveColor = new BABYLON.Color3(0.04, 0.22, 0.06);
+  plantMat.specularColor = new BABYLON.Color3(0.08, 0.35, 0.1);
 
   const alienCoreMat = new BABYLON.StandardMaterial("alienCoreMat", scene);
   alienCoreMat.diffuseColor = new BABYLON.Color3(0.84, 0.60, 0.60);
@@ -348,10 +348,10 @@ export function createRenderer3D(canvas, { gridW, gridH, cellSize }) {
   blobAccentMat.emissiveColor = new BABYLON.Color3(0.08, 0.01, 0.05);
   blobAccentMat.specularColor = new BABYLON.Color3(0.18, 0.04, 0.12);
 
-  const plantGlowMat = new BABYLON.StandardMaterial("plantGlowMat", scene);
-  plantGlowMat.diffuseColor = new BABYLON.Color3(1.0, 0.55, 0.08);
-  plantGlowMat.emissiveColor = new BABYLON.Color3(0.18, 0.08, 0.01);
-  plantGlowMat.specularColor = new BABYLON.Color3(0.25, 0.14, 0.03);
+  const plantGlowMat = new BABYLON.StandardMaterial("poisonPlantGlowMat", scene);
+  plantGlowMat.diffuseColor = new BABYLON.Color3(0.22, 1.0, 0.35);
+  plantGlowMat.emissiveColor = new BABYLON.Color3(0.08, 0.42, 0.1);
+  plantGlowMat.specularColor = new BABYLON.Color3(0.12, 0.55, 0.15);
 
   // =========================
   // Decorations statiques
@@ -899,7 +899,7 @@ export function createRenderer3D(canvas, { gridW, gridH, cellSize }) {
   // =========================
   const alienMeshes = new Map();   // id -> mesh
   const blobMeshes = new Map();     // id -> mesh
-  const plantMeshes = new Map();  // key -> mesh
+  const plantMeshes = new Map();  // key -> mesh (plantes poison)
   const previousAlienPositions = new Map();
   const previousBlobPositions = new Map();
 
@@ -1091,12 +1091,8 @@ export function createRenderer3D(canvas, { gridW, gridH, cellSize }) {
     if (!action || mesh.metadata?.lastActionTick === action.tick) return;
     let played = false;
 
-    if (entityKind === "blob" && action.type === "eatPlant") {
-      played = playActionAnimation(mesh, ["bitefront", "bite_front", "bite"], 650);
-    } else if (entityKind === "alien" && action.type === "eatBlob") {
+    if (entityKind === "alien" && action.type === "eatBlob") {
       played = playActionAnimation(mesh, ["punch"], 650);
-    } else if (entityKind === "alien" && action.type === "eatPlant") {
-      played = playActionAnimation(mesh, ["weapond", "weapon", "attack"], 700);
     }
 
     if (played) {
@@ -1174,10 +1170,10 @@ export function createRenderer3D(canvas, { gridW, gridH, cellSize }) {
   }
 
   // =========================
-  // Sync Plants nutritifs
+  // Sync Plantes Poison
   // =========================
-  function syncPlants(world) {
-    for (const [key, plant] of world.plants.entries()) {
+  function syncPoisonPlants(world) {
+    for (const [key, plant] of world.poisonPlants.entries()) {
       let mesh = plantMeshes.get(key);
 
       if (!mesh) {
@@ -1189,7 +1185,7 @@ export function createRenderer3D(canvas, { gridW, gridH, cellSize }) {
     }
 
     for (const [key, mesh] of plantMeshes.entries()) {
-      if (!world.plants.has(key)) {
+      if (!world.poisonPlants.has(key)) {
         mesh.dispose();
         plantMeshes.delete(key);
       }
@@ -1328,7 +1324,7 @@ export function createRenderer3D(canvas, { gridW, gridH, cellSize }) {
   function renderWorld(world, view) {
     latestViewState = view;
     latestWorld     = world;
-    syncPlants(world);
+    syncPoisonPlants(world);
     syncAliens(world);
     syncBlobs(world);
   }

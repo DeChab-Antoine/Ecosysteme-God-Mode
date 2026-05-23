@@ -119,7 +119,7 @@
 
       .alien-col { color: #c880f0; }
       .blob-col  { color: #ff5090; }
-      .plant-col { color: #60c840; }
+      .poison-col { color: #40e855; }
 
       #popChart {
         width: 100% !important;
@@ -313,9 +313,7 @@
       }
 
       /* Icônes CSS colorées pour éviter les problèmes de police emoji */
-      .icon-plant { color: #70e050; }
-      .icon-blob  { color: #40c0e0; }
-      .icon-alien { color: #c070f0; }
+      .icon-poison { color: #40e855; }
 
       .shop-name {
         font-size: 9px;
@@ -591,33 +589,27 @@
       </button>
 
       <div id="pointsCounter">
-        <span id="pointsDisplay">150</span>
+        <span id="pointsDisplay">10</span>
         <span class="pts-label">points</span>
       </div>
 
-      <div class="shop-card" data-entity="blob">
-        <div class="shop-icon icon-blob">●</div>
-        <div class="shop-name">Blob</div>
-        <div class="shop-cost">120</div>
-      </div>
-
-      <div class="shop-card" data-entity="alien">
-        <div class="shop-icon icon-alien">▲</div>
-        <div class="shop-name">Alien</div>
-        <div class="shop-cost">350</div>
+      <div class="shop-card" data-entity="poisonPlant">
+        <div class="shop-icon icon-poison">☠</div>
+        <div class="shop-name">Poison</div>
+        <div class="shop-cost">5</div>
       </div>
 
       <div id="winGoal">
-        <span class="win-label">Objectif</span>
-        <span id="winProgress">0 / 50</span>
-        <span class="win-target">aliens</span>
+        <span class="win-label">Aliens</span>
+        <span id="alienCount" style="font-size:16px;color:#c070f0;font-weight:bold;">50</span>
+        <span class="win-target">restants</span>
       </div>
     </div>
 
     <!-- Écran Victoire / Défaite -->
     <div id="gameOverScreen">
       <div id="gameOverContent">
-        <h2 id="gameOverTitle" class="win">VICTOIRE</h2>
+        <h2 id="gameOverTitle" class="win">—</h2>
         <p id="gameOverMsg"></p>
         <button id="restartBtn">Recommencer</button>
       </div>
@@ -629,15 +621,15 @@
         <h1>God Mode</h1>
         <div class="intro-subtitle">Exoplanet &nbsp;·&nbsp; Games on Web 2026 &nbsp;·&nbsp; IA Edition</div>
         <div class="intro-lore">
-          <p>Une exoplanète lointaine abrite <em>trois espèces rivales</em>.</p>
-          <p>Elles évoluent, chassent et meurent,</p>
-          <p>guidées par des <em>algorithmes d'intelligence artificielle</em>.</p>
+          <p>Une exoplanète lointaine est envahie par <em>50 aliens</em>.</p>
+          <p>Des blobs errent, guidés par des <em>algorithmes d'intelligence artificielle</em>.</p>
           <p>&nbsp;</p>
-          <p>Vous êtes l'Observateur. <em>Le Dieu de ce monde.</em></p>
-          <p>Dépensez vos points pour façonner l'écosystème.</p>
-          <p>Atteignez <em>50 aliens</em> pour la victoire.</p>
+          <p>Vous êtes l'Exterminateur. <em>Le Dieu de ce monde.</em></p>
+          <p>Posez des <em>plantes poison</em> pour attirer et tuer les aliens.</p>
+          <p>Alien tué : <em>+10 pts</em> — Blob tué : <em>+5 pts</em> — Poison posé : <em>-5 pts</em></p>
+          <p>Éliminez-les tous avant qu'ils atteignent <em>100</em>.</p>
         </div>
-        <button id="startBtn">Commencer l'Observation</button>
+        <button id="startBtn">Commencer l'Extermination</button>
         <div class="intro-hint">[ Entrée ] pour démarrer</div>
       </div>
     </div>

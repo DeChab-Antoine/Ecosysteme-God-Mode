@@ -2,7 +2,7 @@ import { createWorld } from "./world.js";
 import { mulberry32 } from "./rng.js";
 import { createRenderer } from "./renderers/createRenderer.js";
 import { createViewState } from "./viewState.js";
-import { updatePlantSpawns, updatePlantsAging, spawnPlantAt } from "./systems/plantSystem.js";
+import { spawnPoisonPlantAt } from "./systems/plantSystem.js";
 import { spawnInitialAliens, makeAlien } from "./systems/alienSpawnSystem.js";
 import { spawnInitialBlobs, makeBlob, updateBlobDay } from "./systems/blobSystem.js";
 import { updateAlienDay } from "./systems/alienSystem.js";
@@ -28,10 +28,9 @@ const countBlobsEl  = document.getElementById("countBlobs");
 // Etat de vue + config centralisée
 // =========================
 const viewState = createViewState();
-const labels = viewState.config.labels;
-const SHOP_COSTS = viewState.config.shop.costs;
-const POINTS_PER_TICK = viewState.config.shop.pointsPerTick;
-const WIN_ALIENS = viewState.config.shop.winAliens;
+const SHOP_COSTS  = viewState.config.shop.costs;
+const WIN_ALIENS  = viewState.config.shop.winAliens;
+const LOSE_ALIENS = viewState.config.shop.loseAliens;
 const GRACE_TICKS = viewState.config.shop.graceTicks;
 
 // =========================
@@ -46,6 +45,7 @@ const world = createWorld({
 });
 
 world.rand = mulberry32(world.seed);
+world.maxBlobs = viewState.config.initialBlobs.maxBlobs;
 
 // =========================
 // Renderer + audio
@@ -62,7 +62,7 @@ spawnInitialBlobs(world, viewState.config.initialBlobs);
 // =========================
 // Graphes de population
 // =========================
-const MAX_POINTS = 300;   // nb de points conservés dans le graphique
+const MAX_POINTS = 300;
 const popChart = createPopulationChart();
 
 // =========================
@@ -111,35 +111,12 @@ function getPhase() {
 }
 
 // =========================
-// Placement d'entités via shop
+// Placement de plante poison via shop
 // =========================
-function tryPlacePlant(x, y) {
+function tryPlacePoisonPlant(x, y) {
   const gx = Math.max(0, Math.min(world.gridW - 1, x));
   const gy = Math.max(0, Math.min(world.gridH - 1, y));
-  return spawnPlantAt(world, gx, gy, viewState.config.plants);
-}
-
-function tryPlaceBlob(x, y) {
-  const gx = Math.max(0, Math.min(world.gridW - 1, x));
-  const gy = Math.max(0, Math.min(world.gridH - 1, y));
-  const key = cellKey(world, gx, gy);
-  if (world.occupiedBlobs.has(key) || world.occupiedAliens.has(key)) return false;
-  const template = viewState.config.initialBlobs.createBlobTemplate(world);
-  template.E = Math.ceil(template.Emax * 0.8);
-  makeBlob(world, gx, gy, template);
-  world.occupiedBlobs.add(key);
-  return true;
-}
-
-function tryPlaceAlien(x, y) {
-  const gx = Math.max(0, Math.min(world.gridW - 1, x));
-  const gy = Math.max(0, Math.min(world.gridH - 1, y));
-  const key = cellKey(world, gx, gy);
-  if (world.occupiedAliens.has(key) || world.occupiedBlobs.has(key)) return false;
-  const template = viewState.config.initialAliens.createAlienTemplate(world);
-  makeAlien(world, gx, gy, template);
-  world.occupiedAliens.add(key);
-  return true;
+  return spawnPoisonPlantAt(world, gx, gy);
 }
 
 // =========================
@@ -188,8 +165,9 @@ function tick() {
     return;
   }
 
-  // Economie — points passifs
-  viewState.points += POINTS_PER_TICK;
+  // Vider les événements de kill poison du tick précédent
+  world.poisonKillEvents.length = 0;
+
   viewState._alienCount = world.aliens.size;
   if (shopBar) shopBar.refresh();
 
@@ -201,18 +179,18 @@ function tick() {
 
   // Vérification victoire / défaite
   if (!viewState.gameOver && world.tick > GRACE_TICKS) {
-    if (world.aliens.size >= WIN_ALIENS) {
+    if (world.aliens.size === WIN_ALIENS) {
       viewState.gameOver = true;
       viewState.paused = true;
       if (winLoseScreen) winLoseScreen.showWin();
-      audio.playBirth();
-      logEvent(`VICTOIRE — ${WIN_ALIENS} aliens dominent la planète !`);
-    } else if (world.aliens.size === 0) {
+      audio.playDeath();
+      logEvent(`VICTOIRE — tous les aliens ont été éliminés !`);
+    } else if (world.aliens.size >= LOSE_ALIENS) {
       viewState.gameOver = true;
       viewState.paused = true;
       if (winLoseScreen) winLoseScreen.showLose();
-      audio.playDeath();
-      logEvent(`DÉFAITE — tous les aliens ont disparu.`);
+      audio.playBirth();
+      logEvent(`DÉFAITE — les aliens ont envahi la planète (${LOSE_ALIENS}) !`);
     }
   }
 
@@ -225,9 +203,6 @@ function tick() {
   }
 
   if (phase.name === "DAY") {
-    updatePlantSpawns(world, viewState.config.plants);
-    updatePlantsAging(world);
-
     const alienIdsBefore = new Set(world.aliens.keys());
     for (const alien of world.aliens.values()) {
       const prevAction = alien.lastAction;
@@ -235,7 +210,6 @@ function tick() {
       if (alien.lastAction !== prevAction && alien.lastAction?.tick === world.tick) {
         const vol = renderer.getAudioVolume ? renderer.getAudioVolume(alien.x, alien.y) : 1;
         if (alien.lastAction.type === "eatBlob") audio.playEatBlob(vol * 0.55);
-        else if (alien.lastAction.type === "eatPlant") audio.playEatPlant(vol * 0.35);
       }
     }
     for (const [id, alien] of world.aliens.entries()) {
@@ -246,19 +220,15 @@ function tick() {
     }
 
     const blobIdsBefore = new Set(world.blobs.keys());
-    const movingBlobs   = new Set();
+    const movingBlobs = new Set();
     for (const [id, blob] of world.blobs.entries()) {
-      const prevX      = blob.x;
-      const prevY      = blob.y;
-      const prevAction = blob.lastAction;
+      const prevX = blob.x;
+      const prevY = blob.y;
       updateBlobDay(world, blob);
       const vol = renderer.getAudioVolume ? renderer.getAudioVolume(blob.x, blob.y) : 1;
       if (blob.x !== prevX || blob.y !== prevY) {
         movingBlobs.add(id);
         audio.startBlobStep(id, vol * 0.3);
-      }
-      if (blob.lastAction !== prevAction && blob.lastAction?.tick === world.tick) {
-        if (blob.lastAction.type === "eatPlant") audio.playEatPlant(vol * 0.35);
       }
     }
     for (const [id, blob] of world.blobs.entries()) {
@@ -268,6 +238,18 @@ function tick() {
       }
     }
     audio.stopBlobStepsExcept(movingBlobs);
+
+    // Récompenses pour les kills par poison
+    for (const evt of world.poisonKillEvents) {
+      if (evt.type === "alien") {
+        viewState.points += 10;
+        logEvent(`Alien empoisonné ! (+10 pts)`);
+      } else if (evt.type === "blob") {
+        viewState.points += 5;
+        logEvent(`Blob empoisonné (+5 pts)`);
+      }
+    }
+    if (world.poisonKillEvents.length > 0 && shopBar) shopBar.refresh();
 
   } else {
     audio.stopAllBlobSteps();
@@ -327,7 +309,7 @@ function startGame() {
     }
   });
 
-  // Clic sur terrain → placer l'entité sélectionnée
+  // Clic sur terrain → placer la plante poison sélectionnée
   if (renderer.setGroundClickCallback) {
     renderer.setGroundClickCallback((x, z) => {
       const entity = viewState.selectedShopItem;
@@ -337,18 +319,14 @@ function startGame() {
 
       let placed = false;
       const spawnVol = renderer.getAudioVolume ? renderer.getAudioVolume(x, z) : 1;
-      if (entity === "blob") {
-        placed = tryPlaceBlob(x, z);
-        if (placed) audio.playSpawn(spawnVol * 0.5);
-      } else if (entity === "alien") {
-        placed = tryPlaceAlien(x, z);
+      if (entity === "poisonPlant") {
+        placed = tryPlacePoisonPlant(x, z);
         if (placed) audio.playSpawn(spawnVol * 0.5);
       }
 
       if (placed) {
         viewState.points -= cost;
-        const name = entity.charAt(0).toUpperCase() + entity.slice(1);
-        logEvent(`${name} placé(e) en (${x}, ${z})`);
+        logEvent(`Poison posé en (${x}, ${z}) (-${cost} pts)`);
         shopBar.refresh();
       }
     });

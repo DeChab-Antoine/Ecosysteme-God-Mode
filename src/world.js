@@ -9,23 +9,26 @@ export function createWorld({ gridW, gridH, dayTicks, nightTicks, seed }) {
     tick: 0,
     day: 0,
 
-
     // RNG seedé (fonction rand())
     seed,
     rand: null, // sera injecté dans main
 
     // Entités
-    plants: new Map(), // plants nutritives, key -> { x, y, valE }
-    aliens: new Map(), // aliens, id -> { id, x, y, E, Emax, R }
-    blobs: new Map(), // blobs, id -> { id, x, y, E, Emax}
+    poisonPlants: new Map(), // plantes poison, key -> { x, y }
+    aliens: new Map(),       // aliens, id -> { id, x, y, E, Emax, R }
+    blobs: new Map(),        // blobs, id -> { id, x, y, E, Emax }
 
     // Occupation (pour empêcher spawn sur case déjà prise)
-    occupiedPlants: new Set(), // key
-    occupiedAliens: new Set(),  // key
-    occupiedBlobs: new Set(),    // key
+    occupiedPoisonPlants: new Set(),
+    occupiedAliens: new Set(),
+    occupiedBlobs: new Set(),
 
     // Compteurs d'ID des entites autonomes.
     nextAlienId: 1,
-    nextBlobId: 1
+    nextBlobId: 1,
+    maxBlobs: 120,  // injecté depuis config au démarrage
+
+    // Événements de kills par poison (lus et vidés chaque tick par main.js)
+    poisonKillEvents: [],
   };
 }

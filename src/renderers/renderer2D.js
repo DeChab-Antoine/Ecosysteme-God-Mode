@@ -98,9 +98,9 @@ export function createRenderer2D(canvas, { gridW, gridH, cellSize }) {
     clear();
     drawGrid();
 
-    // Plants nutritifs = pixels orange
-    for (const plant of world.plants.values()) {
-        fillCell(plant.x, plant.y, "rgb(255, 119, 0)");
+    // Plantes poison = pixels vert toxique
+    for (const plant of world.poisonPlants.values()) {
+        fillCell(plant.x, plant.y, "rgb(40, 220, 80)");
     }
 
     // Aliens = pixels pales

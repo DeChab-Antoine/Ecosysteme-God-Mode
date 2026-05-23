@@ -1,10 +1,9 @@
 export function createShopBar(viewState, onCameraToggle) {
   const cards = document.querySelectorAll(".shop-card");
   const pointsEl = document.getElementById("pointsDisplay");
-  const winProgressEl = document.getElementById("winProgress");
+  const alienCountEl = document.getElementById("alienCount");
   const cameraBtnEl = document.getElementById("cameraModeBtn");
   const costs = viewState.config.shop.costs;
-  const winAliens = viewState.config.shop.winAliens;
 
   // Clic sur une carte entité
   cards.forEach((card) => {
@@ -31,7 +30,6 @@ export function createShopBar(viewState, onCameraToggle) {
     cameraBtnEl.addEventListener("click", () => {
       viewState.cameraMode = !viewState.cameraMode;
       if (viewState.cameraMode) {
-        // En mode caméra : déselectionne l'entité courante
         viewState.selectedShopItem = null;
       }
       onCameraToggle(viewState.cameraMode);
@@ -76,9 +74,9 @@ export function createShopBar(viewState, onCameraToggle) {
         : "Mode placement actif — clic gauche pour poser";
     }
 
-    // Progression victoire
-    if (winProgressEl) {
-      winProgressEl.textContent = `${viewState._alienCount ?? 0} / ${winAliens}`;
+    // Compteur d'aliens restants
+    if (alienCountEl) {
+      alienCountEl.textContent = viewState._alienCount ?? 0;
     }
   }
 

@@ -37,7 +37,7 @@ function trySpawnAlien(world, x, y, createAlienTemplate) {
   const key = cellKey(world, x, y);
 
   if (world.occupiedAliens.has(key)) return false;
-  if (world.occupiedPlants.has(key)) return false;
+  if (world.occupiedPoisonPlants.has(key)) return false;
   if (world.occupiedBlobs.has(key)) return false;
 
   const template = createAlienTemplate(world); 

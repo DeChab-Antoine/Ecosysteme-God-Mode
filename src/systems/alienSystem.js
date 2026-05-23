@@ -1,34 +1,33 @@
-import { moveTo, removePlantAt, removeBlobAt, cellKey, dist2, clamp, findFreeNeighborCell } from "./worldOps.js";
+import { moveTo, removePoisonPlantAt, removeBlobAt, cellKey, dist2, clamp, findFreeNeighborCell } from "./worldOps.js";
 import { makeAlien } from "./alienSpawnSystem.js";
 
-const PURSUIT_MEMORY_TICKS = 40; // ticks pendant lesquels l'alien poursuit une dernière position connue
+const PURSUIT_MEMORY_TICKS  = 40; // ticks pendant lesquels l'alien poursuit une dernière position connue
+const POISON_ATTRACT_RADIUS = 10; // rayon d'attraction vers les plantes poison (priorité absolue)
 
 // =========================
-// Perception — avec priorité selon la faim
+// Perception — avec priorité selon la faim et les plantes poison
 // =========================
 
 function findBestTarget(world, alien) {
-  const R2 = alien.R * alien.R;
+  const blobR2   = alien.R * alien.R;
+  const poisonR2 = POISON_ATTRACT_RADIUS * POISON_ATTRACT_RADIUS;
+
+  // Plantes poison — priorité absolue dans le rayon 10
+  let bestPoison = null, bestPoisonD2 = Infinity;
+  for (const p of world.poisonPlants.values()) {
+    const d2 = dist2(alien.x, alien.y, p.x, p.y);
+    if (d2 <= poisonR2 && d2 < bestPoisonD2) { bestPoisonD2 = d2; bestPoison = p; }
+  }
+  if (bestPoison) return bestPoison;
+
+  // Blobs — dans le rayon de vision alien
   const hungry = alien.E < alien.Emax * 0.6;
-
   let bestBlob = null, bestBlobD2 = Infinity;
-  let bestPlant = null, bestPlantD2 = Infinity;
-
   for (const p of world.blobs.values()) {
     const d2 = dist2(alien.x, alien.y, p.x, p.y);
-    if (d2 <= R2 && d2 < bestBlobD2) { bestBlobD2 = d2; bestBlob = p; }
+    if (d2 <= blobR2 && d2 < bestBlobD2) { bestBlobD2 = d2; bestBlob = p; }
   }
-
-  for (const c of world.plants.values()) {
-    const d2 = dist2(alien.x, alien.y, c.x, c.y);
-    if (d2 <= R2 && d2 < bestPlantD2) { bestPlantD2 = d2; bestPlant = c; }
-  }
-
-  // Affamé et un blob en vue → chasse le blob en priorité
-  if (hungry && bestBlob) return bestBlob;
-  // Sinon → la cible la plus proche (blob ou plante)
-  if (bestBlob && bestPlant) return bestBlobD2 < bestPlantD2 ? bestBlob : bestPlant;
-  return bestBlob ?? bestPlant;
+  return bestBlob;
 }
 
 // =========================
@@ -44,19 +43,14 @@ function canDuplicate(alien) {
   );
 }
 
-function mutate(world, a) {
-  return a * (0.8 + world.rand() * 0.4);
-}
-
-function createChildTemplate(world, parent) {
-  const Emax = mutate(world, parent.Emax);
+function createChildTemplate(parent) {
   return {
-    E:    Emax,
-    Emax,
+    E:                    parent.Emax,
+    Emax:                 parent.Emax,
     energyDecayPerTick:   parent.energyDecayPerTick,
-    R:                    mutate(world, parent.R),
-    age:  0,
-    lifespan:             mutate(world, parent.lifespan),
+    R:                    parent.R,
+    age:                  0,
+    lifespan:             parent.lifespan,
     duplicationCost:      parent.duplicationCost,
     duplicationTick:      0,
     duplicationTickDelay: parent.duplicationTickDelay,
@@ -67,7 +61,7 @@ export function tryDuplicate(world, parent) {
   const spot = findFreeNeighborCell(world, parent.x, parent.y);
   if (!spot) return false;
 
-  makeAlien(world, spot.x, spot.y, createChildTemplate(world, parent));
+  makeAlien(world, spot.x, spot.y, createChildTemplate(parent));
   world.occupiedAliens.add(cellKey(world, spot.x, spot.y));
 
   parent.E = clamp(parent.E - parent.duplicationCost, 0, parent.Emax);
@@ -79,31 +73,41 @@ export function tryDuplicate(world, parent) {
 // Mouvement
 // =========================
 
-function stepTowards(world, alien, tx, ty) {
-  const dx = tx - alien.x;
-  const dy = ty - alien.y;
+function stepTowards(world, entity, tx, ty) {
+  const dx = tx - entity.x;
+  const dy = ty - entity.y;
   const sx = Math.sign(dx);
   const sy = Math.sign(dy);
 
-  if (sx !== 0 && sy !== 0 && moveTo(world, alien, alien.x + sx, alien.y + sy)) return;
+  if (sx !== 0 && sy !== 0 && moveTo(world, entity, entity.x + sx, entity.y + sy)) return;
 
-  const primary   = Math.abs(dx) >= Math.abs(dy)
-    ? { x: alien.x + sx, y: alien.y }
-    : { x: alien.x,      y: alien.y + sy };
-  if (moveTo(world, alien, primary.x, primary.y)) return;
+  const primary = Math.abs(dx) >= Math.abs(dy)
+    ? { x: entity.x + sx, y: entity.y }
+    : { x: entity.x,      y: entity.y + sy };
+  if (moveTo(world, entity, primary.x, primary.y)) return;
 
   const secondary = Math.abs(dx) >= Math.abs(dy)
-    ? { x: alien.x,      y: alien.y + sy }
-    : { x: alien.x + sx, y: alien.y };
-  if (moveTo(world, alien, secondary.x, secondary.y)) return;
+    ? { x: entity.x,      y: entity.y + sy }
+    : { x: entity.x + sx, y: entity.y };
+  if (moveTo(world, entity, secondary.x, secondary.y)) return;
 
-  randomStep(world, alien);
+  const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+  for (let i = 3; i > 0; i--) {
+    const j = Math.floor(world.rand() * (i + 1));
+    [dirs[i], dirs[j]] = [dirs[j], dirs[i]];
+  }
+  for (const [ddx, ddy] of dirs) {
+    if (moveTo(world, entity, entity.x + ddx, entity.y + ddy)) return;
+  }
 }
 
-function randomStep(world, alien) {
-  const dirs = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
-  const [dx, dy] = dirs[Math.floor(world.rand() * dirs.length)];
-  moveTo(world, alien, alien.x + dx, alien.y + dy);
+function wanderStep(world, entity) {
+  if (entity.wanderX === undefined ||
+      Math.abs(entity.x - entity.wanderX) + Math.abs(entity.y - entity.wanderY) <= 3) {
+    entity.wanderX = Math.floor(world.rand() * world.gridW);
+    entity.wanderY = Math.floor(world.rand() * world.gridH);
+  }
+  stepTowards(world, entity, entity.wanderX, entity.wanderY);
 }
 
 // =========================
@@ -122,7 +126,7 @@ export function updateAlienDay(world, alien) {
   const target  = findBestTarget(world, alien);
 
   if (target) {
-    // Met à jour la mémoire si c'est un blob (mobile)
+    // Met à jour la mémoire uniquement pour les blobs (mobiles)
     if (target.type === "blob") {
       alien.memory = { x: target.x, y: target.y, tick: world.tick };
     }
@@ -131,35 +135,37 @@ export function updateAlienDay(world, alien) {
   } else if (!wellFed && alien.memory && (world.tick - alien.memory.tick) < PURSUIT_MEMORY_TICKS) {
     // Poursuite vers la dernière position connue d'un blob
     stepTowards(world, alien, alien.memory.x, alien.memory.y);
-    // Arrivé sur place : efface la mémoire
     if (alien.x === alien.memory.x && alien.y === alien.memory.y) alien.memory = null;
 
   } else {
-    // Errance (rassasié ou mémoire expirée)
+    // Errance (rassasié ou mémoire expirée) : waypoint global
     alien.memory = null;
-    randomStep(world, alien);
+    wanderStep(world, alien);
   }
 
   if (canDuplicate(alien)) tryDuplicate(world, alien);
 
   const key = cellKey(world, alien.x, alien.y);
 
-  if (world.occupiedPlants.has(key)) {
-    const plant = world.plants.get(key);
-    if (plant) {
-      removePlantAt(world, alien.x, alien.y);
-      alien.E = clamp(alien.E + plant.valE, 0, alien.Emax);
-      alien.lastAction = { type: "eatPlant", tick: world.tick };
+  // Vérifier si l'alien marche sur une plante poison → mort instantanée
+  if (world.occupiedPoisonPlants.has(key)) {
+    if (world.poisonPlants.has(key)) {
+      removePoisonPlantAt(world, alien.x, alien.y);
+      world.poisonKillEvents.push({ type: "alien" });
+      world.occupiedAliens.delete(key);
+      world.aliens.delete(alien.id);
+      return;
     }
   }
 
+  // Manger un blob si on est sur la même case
   if (world.occupiedBlobs.has(key) && alien.E < alien.Emax) {
     for (const p of world.blobs.values()) {
       if (p.x === alien.x && p.y === alien.y) {
         removeBlobAt(world, p);
         alien.E = clamp(alien.E + p.valE, 0, alien.Emax);
         alien.lastAction = { type: "eatBlob", tick: world.tick };
-        alien.memory = null; // proie capturée, mémoire inutile
+        alien.memory = null;
         break;
       }
     }
