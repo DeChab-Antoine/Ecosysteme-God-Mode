@@ -69,7 +69,7 @@ export function createViewState() {
       },
 
       initialBlobs: {
-        count: 30,
+        count: 60,
         maxAttempts: 5000,
         maxBlobs: 100,       // plafond global anti-explosion
 
@@ -77,7 +77,7 @@ export function createViewState() {
           return {
             lifespan: 4000,              // ~400s à ×1 — vivent bien plus longtemps
             valE: 50,                    // énergie donnée à l'alien qui le mange
-            duplicationChance: 0.005,     // 0.5% de chance de duplication par tick
+            duplicationChance: 0.006,     // 0.5% de chance de duplication par tick
           };
         },
       },
