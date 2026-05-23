@@ -5,85 +5,643 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Exoplanet God Mode</title>
     <style>
-      body { margin: 0; background: rgb(0, 0, 0); height: 100vh; }
-      #layout {
-        display: flex;
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+
+      body {
+        background: #000;
         height: 100vh;
-        align-items: flex-start;
-        gap: 12px;
-        padding: 12px;
-        box-sizing: border-box;
+        overflow: hidden;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       }
-      canvas { 
-        image-rendering: pixelated; 
-        background: rgb(255, 255, 255); 
-        width: 960px;
-        height: 720px;
+
+      /* === Canvas Babylon.js plein écran === */
+      #game {
+        position: fixed;
+        top: 0; left: 0;
+        width: 100vw; height: 100vh;
         display: block;
       }
 
-      #stats {
-        width: 320px;
-        border: 2px solid black;
-        padding: 10px;
-        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-        background: #fff;
-        height: fit-content;
-        max-height: calc(100vh - 24px);
-        overflow: auto;
-      }
-      #stats h3 { 
-        margin: 0 0 8px 0;
-        font-size: 25px; 
-      }
-      #statsSummary { 
-        margin: 0 0 8px 0; 
-        font-size: 20px;
+      /* === Panneau HUD générique === */
+      .hud-panel {
+        position: fixed;
+        background: rgba(4, 5, 18, 0.84);
+        border: 1px solid rgba(90, 110, 200, 0.28);
+        border-radius: 10px;
+        padding: 12px 14px;
+        color: #b0c0e8;
+        font-size: 13px;
+        backdrop-filter: blur(6px);
+        pointer-events: none;
       }
 
+      /* === Stats HUD (haut-droite) === */
       #hud {
-        position: absolute;
-        top: 12px;
-        right: 12px;
+        top: 16px; right: 16px;
+        width: 248px;
+      }
 
-        width: 360px;
-        padding: 12px;
+      #hudHeader {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 10px;
+      }
 
-        background: rgba(0, 0, 0, 0.35);
-        border-radius: 12px;
-        color: white;
+      #phaseLabel {
+        font-size: 10px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: #6878b8;
+        flex: 1;
+      }
 
+      #phaseLabel.night { color: #3848a0; }
+
+      #speedStatus {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+      }
+
+      .badge {
+        background: rgba(80, 100, 200, 0.22);
+        border: 1px solid rgba(80, 100, 200, 0.38);
+        border-radius: 4px;
+        padding: 2px 8px;
+        font-size: 11px;
+        color: #90a8e8;
+        letter-spacing: 1px;
+      }
+
+      .badge.paused {
+        background: rgba(200, 60, 60, 0.22);
+        border-color: rgba(200, 60, 60, 0.38);
+        color: #f08080;
+      }
+
+      /* Compteurs de population */
+      #popCounts {
+        display: flex;
+        align-items: stretch;
+        margin-bottom: 10px;
+        background: rgba(20, 26, 60, 0.5);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      .pop-item {
+        flex: 1;
         display: flex;
         flex-direction: column;
-        gap: 12px;  
+        align-items: center;
+        padding: 8px 4px;
       }
 
-      #stats {
-        font-family: monospace;
-        font-size: 14px;
+      .pop-sep {
+        width: 1px;
+        background: rgba(80, 100, 200, 0.15);
       }
+
+      .pop-num {
+        font-size: 22px;
+        font-weight: bold;
+        line-height: 1;
+        margin-bottom: 3px;
+      }
+
+      .pop-lbl {
+        font-size: 8px;
+        color: #404870;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+      }
+
+      .alien-col { color: #c880f0; }
+      .blob-col  { color: #ff5090; }
+      .plant-col { color: #60c840; }
 
       #popChart {
-        width: 100%;
-        height: 160px;
+        width: 100% !important;
+        height: 90px !important;
+      }
+
+      /* === Contrôles (bas-gauche, simplifié) === */
+      #controlsPanel {
+        bottom: 100px; left: 16px;
+        width: 230px;
+        pointer-events: none;
+      }
+
+      #controlsPanel h4 {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        color: #505888;
+        margin-bottom: 8px;
+      }
+
+      .ctrl-row {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        margin-bottom: 5px;
+        font-size: 12px;
+        color: #7080a8;
+      }
+
+      kbd {
+        background: rgba(70, 90, 170, 0.28);
+        border: 1px solid rgba(70, 90, 170, 0.48);
+        border-radius: 3px;
+        padding: 1px 6px;
+        font-size: 10px;
+        font-family: inherit;
+        color: #a0b4f0;
+        white-space: nowrap;
+      }
+
+      /* === Journal d'événements (bas-droite) === */
+      #eventLog {
+        bottom: 100px; right: 16px;
+        width: 280px;
+        min-height: 32px;
+        max-height: 170px;
+        overflow: hidden;
+      }
+
+      .evt {
+        font-size: 11px;
+        color: #7080a8;
+        padding: 3px 0;
+        border-bottom: 1px solid rgba(70, 90, 160, 0.12);
+        line-height: 1.4;
+      }
+
+      .evt:first-child { color: #c0caf0; }
+      .evt:last-child { border-bottom: none; }
+
+      /* =====================================================
+         === Bouton bascule Caméra / Placement
+         ===================================================== */
+      #cameraModeBtn {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 8px 11px;
+        border-radius: 10px;
+        border: 1px solid rgba(80, 100, 200, 0.28);
+        background: rgba(14, 18, 50, 0.6);
+        color: #505878;
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 9px;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        transition: all 0.15s;
+        margin-right: 4px;
+      }
+
+      #cameraModeBtn .btn-icon {
+        font-size: 20px;
+        margin-bottom: 3px;
+        line-height: 1;
+      }
+
+      #cameraModeBtn.active {
+        background: rgba(30, 50, 140, 0.45);
+        border-color: rgba(100, 140, 255, 0.7);
+        color: #90b8ff;
+        box-shadow: 0 0 14px rgba(80, 120, 255, 0.22);
+      }
+
+      #cameraModeBtn:hover {
+        border-color: rgba(120, 150, 255, 0.55);
+        color: #8090c0;
+      }
+
+      #cameraModeBtn.active:hover {
+        background: rgba(40, 65, 170, 0.5);
+      }
+
+      /* =====================================================
+         === Barre Shop (style Plants vs Zombies, bas centre)
+         ===================================================== */
+      #shopBar {
+        position: fixed;
+        bottom: 16px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: rgba(4, 5, 18, 0.92);
+        border: 1px solid rgba(90, 110, 200, 0.32);
+        border-radius: 14px;
+        padding: 10px 18px;
+        backdrop-filter: blur(10px);
+        z-index: 100;
+        pointer-events: all;
+        user-select: none;
+        box-shadow: 0 4px 28px rgba(0, 0, 0, 0.5);
+      }
+
+      /* Compteur de points */
+      #pointsCounter {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding-right: 14px;
+        border-right: 1px solid rgba(80, 100, 200, 0.22);
+        margin-right: 6px;
+        min-width: 70px;
+      }
+
+      #pointsDisplay {
+        font-size: 24px;
+        color: #ffd080;
+        font-weight: bold;
+        line-height: 1;
+        min-width: 58px;
+        text-align: center;
+        transition: color 0.2s;
+      }
+
+      .pts-label {
+        font-size: 9px;
+        color: #604820;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        margin-top: 3px;
+      }
+
+      /* Carte entité */
+      .shop-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: 78px;
+        padding: 8px 6px 7px;
+        border-radius: 10px;
+        border: 1px solid rgba(80, 100, 200, 0.28);
+        background: rgba(14, 18, 50, 0.6);
+        cursor: pointer;
+        transition: background 0.15s, border-color 0.15s, box-shadow 0.15s, opacity 0.15s;
+      }
+
+      .shop-card:hover:not(.disabled) {
+        background: rgba(50, 70, 160, 0.3);
+        border-color: rgba(130, 150, 255, 0.55);
+        box-shadow: 0 0 10px rgba(100, 130, 255, 0.15);
+      }
+
+      .shop-card.selected {
+        background: rgba(90, 50, 180, 0.4);
+        border-color: rgba(180, 120, 255, 0.85);
+        box-shadow: 0 0 18px rgba(160, 100, 255, 0.4);
+      }
+
+      .shop-card.disabled {
+        opacity: 0.3;
+        cursor: not-allowed;
+      }
+
+      .shop-icon {
+        font-size: 24px;
+        line-height: 1;
+        margin-bottom: 5px;
+      }
+
+      /* Icônes CSS colorées pour éviter les problèmes de police emoji */
+      .icon-plant { color: #70e050; }
+      .icon-blob  { color: #40c0e0; }
+      .icon-alien { color: #c070f0; }
+
+      .shop-name {
+        font-size: 9px;
+        color: #8090c0;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        margin-bottom: 5px;
+      }
+
+      .shop-cost {
+        font-size: 12px;
+        color: #ffd080;
+        font-weight: bold;
+        letter-spacing: 0.5px;
+      }
+
+      .shop-card.disabled .shop-cost { color: #503820; }
+
+      /* Séparateur + objectif victoire */
+      #winGoal {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding-left: 14px;
+        border-left: 1px solid rgba(80, 100, 200, 0.22);
+        margin-left: 6px;
+        min-width: 66px;
+      }
+
+      .win-label {
+        font-size: 9px;
+        color: #505888;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        margin-bottom: 4px;
+      }
+
+      #winProgress {
+        font-size: 16px;
+        color: #c070f0;
+        font-weight: bold;
+      }
+
+      .win-target {
+        font-size: 9px;
+        color: #403858;
+        margin-top: 2px;
+        letter-spacing: 1px;
+      }
+
+      /* =====================================================
+         === Écran Victoire / Défaite
+         ===================================================== */
+      #gameOverScreen {
+        position: fixed;
+        top: 0; left: 0;
+        width: 100vw; height: 100vh;
+        background: rgba(0, 0, 0, 0.78);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 500;
+        backdrop-filter: blur(8px);
+      }
+
+      #gameOverContent {
+        text-align: center;
+        padding: 60px 80px;
+        background: rgba(4, 5, 18, 0.94);
+        border: 1px solid rgba(90, 110, 200, 0.32);
+        border-radius: 18px;
+        box-shadow: 0 0 60px rgba(0, 0, 0, 0.7);
+        animation: fadeInUp 0.5s ease;
+      }
+
+      @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(24px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+
+      #gameOverTitle {
+        font-size: 52px;
+        letter-spacing: 8px;
+        text-transform: uppercase;
+        margin-bottom: 18px;
+      }
+
+      #gameOverTitle.win {
+        color: #80e840;
+        text-shadow: 0 0 36px rgba(100, 220, 40, 0.55), 0 0 80px rgba(80, 200, 20, 0.22);
+      }
+
+      #gameOverTitle.lose {
+        color: #f05050;
+        text-shadow: 0 0 36px rgba(220, 50, 50, 0.55), 0 0 80px rgba(200, 30, 30, 0.22);
+      }
+
+      #gameOverMsg {
+        font-size: 15px;
+        color: #6878a8;
+        margin-bottom: 44px;
+        line-height: 2;
+      }
+
+      #restartBtn {
+        background: transparent;
+        border: 1px solid rgba(160, 100, 255, 0.55);
+        color: #c080ff;
+        font-family: inherit;
+        font-size: 13px;
+        letter-spacing: 4px;
+        text-transform: uppercase;
+        padding: 13px 42px;
+        cursor: pointer;
+        transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+      }
+
+      #restartBtn:hover {
+        background: rgba(160, 100, 255, 0.15);
+        border-color: rgba(190, 130, 255, 0.9);
+        box-shadow: 0 0 24px rgba(160, 100, 255, 0.3);
+      }
+
+      /* === Écran d'introduction === */
+      #introScreen {
+        position: fixed;
+        top: 0; left: 0;
+        width: 100vw; height: 100vh;
+        background: radial-gradient(ellipse at 50% 45%, #0c0818 0%, #020108 100%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        transition: opacity 0.8s ease;
+        cursor: pointer;
+      }
+
+      #introScreen::before {
+        content: '';
+        position: absolute;
+        width: 560px; height: 560px;
+        background: radial-gradient(circle, rgba(100, 40, 160, 0.18) 0%, transparent 68%);
+        border-radius: 50%;
+        animation: introPulse 5s ease-in-out infinite;
+        pointer-events: none;
+      }
+
+      @keyframes introPulse {
+        0%, 100% { transform: scale(1); opacity: 0.6; }
+        50%       { transform: scale(1.08); opacity: 1; }
+      }
+
+      #introContent {
+        text-align: center;
+        z-index: 1;
+        max-width: 600px;
+        padding: 40px 32px;
+      }
+
+      #introContent h1 {
+        font-size: 48px;
+        color: #c080ff;
+        text-transform: uppercase;
+        letter-spacing: 8px;
+        margin-bottom: 6px;
+        text-shadow: 0 0 36px rgba(180, 80, 255, 0.55), 0 0 80px rgba(140, 40, 220, 0.25);
+        animation: titleGlow 3.5s ease-in-out infinite alternate;
+      }
+
+      @keyframes titleGlow {
+        from { text-shadow: 0 0 28px rgba(180, 80, 255, 0.45), 0 0 60px rgba(140, 40, 220, 0.18); }
+        to   { text-shadow: 0 0 48px rgba(200, 100, 255, 0.75), 0 0 100px rgba(160, 60, 240, 0.35); }
+      }
+
+      .intro-subtitle {
+        font-size: 11px;
+        color: #4a5278;
+        letter-spacing: 3.5px;
+        text-transform: uppercase;
+        margin-bottom: 40px;
+      }
+
+      .intro-lore {
+        font-size: 14px;
+        color: #7888b8;
+        line-height: 2.1;
+        margin-bottom: 44px;
+      }
+
+      .intro-lore p { margin-bottom: 4px; }
+
+      .intro-lore em {
+        color: #a0b0e0;
+        font-style: normal;
+      }
+
+      #startBtn {
+        background: transparent;
+        border: 1px solid rgba(160, 100, 255, 0.55);
+        color: #c080ff;
+        font-family: inherit;
+        font-size: 14px;
+        letter-spacing: 4px;
+        text-transform: uppercase;
+        padding: 14px 44px;
+        cursor: pointer;
+        transition: background 0.25s, border-color 0.25s, box-shadow 0.25s;
+        pointer-events: all;
+      }
+
+      #startBtn:hover {
+        background: rgba(160, 100, 255, 0.14);
+        border-color: rgba(180, 120, 255, 0.9);
+        box-shadow: 0 0 22px rgba(160, 100, 255, 0.28);
+      }
+
+      .intro-hint {
+        margin-top: 16px;
+        font-size: 10px;
+        color: #303248;
+        letter-spacing: 2px;
+        text-transform: uppercase;
       }
     </style>
-
   </head>
   <body>
-    <div id="layout">
-      <canvas id="game"></canvas>
 
-      <div id="stats">
-        <h3>Stats</h3>
-        <pre id="statsSummary"></pre>
+    <!-- Canvas Babylon.js plein écran -->
+    <canvas id="game"></canvas>
 
-        <div id="chartWrap">
-          <canvas id="popChartAliens"></canvas>
-          <canvas id="popChartBlobs"></canvas>
+    <!-- HUD Stats (haut-droite) -->
+    <div class="hud-panel" id="hud">
+      <div id="hudHeader">
+        <span id="phaseLabel">Jour 0</span>
+        <div id="speedStatus">
+          <span class="badge" id="speedBadge">×1</span>
+          <span class="badge paused" id="pauseBadge" style="display:none">PAUSE</span>
         </div>
       </div>
+      <div id="popCounts">
+        <div class="pop-item">
+          <span class="pop-num alien-col" id="countAliens">0</span>
+          <span class="pop-lbl">Aliens</span>
+        </div>
+        <div class="pop-sep"></div>
+        <div class="pop-item">
+          <span class="pop-num blob-col" id="countBlobs">0</span>
+          <span class="pop-lbl">Blobs</span>
+        </div>
+      </div>
+      <canvas id="popChart"></canvas>
     </div>
+
+    <!-- Contrôles (bas-gauche, simplifié) -->
+    <div class="hud-panel" id="controlsPanel">
+      <h4>Contrôles</h4>
+      <div class="ctrl-row"><kbd>ESPACE</kbd> <span>Pause / Reprendre</span></div>
+      <div class="ctrl-row"><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> <span>Vitesse ×1 ×2 ×4</span></div>
+      <div class="ctrl-row"><kbd>ESC</kbd> <span>Annuler sélection</span></div>
+      <div class="ctrl-row" style="color:#404868"><kbd>Clic droit</kbd> <span>Annuler / orbiter (mode placement)</span></div>
+    </div>
+
+    <!-- Journal d'événements (bas-droite) -->
+    <div class="hud-panel" id="eventLog"></div>
+
+    <!-- Barre shop PvZ (bas-centre) -->
+    <div id="shopBar">
+      <!-- Bouton mode caméra / placement -->
+      <button id="cameraModeBtn" class="active" title="Mode caméra actif — clic gauche pour orbiter">
+        <span class="btn-icon">◎</span>
+        <span>Caméra</span>
+      </button>
+
+      <div id="pointsCounter">
+        <span id="pointsDisplay">150</span>
+        <span class="pts-label">points</span>
+      </div>
+
+      <div class="shop-card" data-entity="blob">
+        <div class="shop-icon icon-blob">●</div>
+        <div class="shop-name">Blob</div>
+        <div class="shop-cost">120</div>
+      </div>
+
+      <div class="shop-card" data-entity="alien">
+        <div class="shop-icon icon-alien">▲</div>
+        <div class="shop-name">Alien</div>
+        <div class="shop-cost">350</div>
+      </div>
+
+      <div id="winGoal">
+        <span class="win-label">Objectif</span>
+        <span id="winProgress">0 / 50</span>
+        <span class="win-target">aliens</span>
+      </div>
+    </div>
+
+    <!-- Écran Victoire / Défaite -->
+    <div id="gameOverScreen">
+      <div id="gameOverContent">
+        <h2 id="gameOverTitle" class="win">VICTOIRE</h2>
+        <p id="gameOverMsg"></p>
+        <button id="restartBtn">Recommencer</button>
+      </div>
+    </div>
+
+    <!-- Écran d'introduction -->
+    <div id="introScreen">
+      <div id="introContent">
+        <h1>God Mode</h1>
+        <div class="intro-subtitle">Exoplanet &nbsp;·&nbsp; Games on Web 2026 &nbsp;·&nbsp; IA Edition</div>
+        <div class="intro-lore">
+          <p>Une exoplanète lointaine abrite <em>trois espèces rivales</em>.</p>
+          <p>Elles évoluent, chassent et meurent,</p>
+          <p>guidées par des <em>algorithmes d'intelligence artificielle</em>.</p>
+          <p>&nbsp;</p>
+          <p>Vous êtes l'Observateur. <em>Le Dieu de ce monde.</em></p>
+          <p>Dépensez vos points pour façonner l'écosystème.</p>
+          <p>Atteignez <em>50 aliens</em> pour la victoire.</p>
+        </div>
+        <button id="startBtn">Commencer l'Observation</button>
+        <div class="intro-hint">[ Entrée ] pour démarrer</div>
+      </div>
+    </div>
+
     <script src="https://cdn.babylonjs.com/babylon.js"></script>
     <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>

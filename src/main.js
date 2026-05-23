@@ -2,21 +2,37 @@ import { createWorld } from "./world.js";
 import { mulberry32 } from "./rng.js";
 import { createRenderer } from "./renderers/createRenderer.js";
 import { createViewState } from "./viewState.js";
-import { updatePlantSpawns, updatePlantsAging } from "./systems/plantSystem.js";
-import { spawnInitialAliens } from "./systems/alienSpawnSystem.js";
-import { spawnInitialBlobs, updateBlobDay } from "./systems/blobSystem.js";
+import { updatePlantSpawns, updatePlantsAging, spawnPlantAt } from "./systems/plantSystem.js";
+import { spawnInitialAliens, makeAlien } from "./systems/alienSpawnSystem.js";
+import { spawnInitialBlobs, makeBlob, updateBlobDay } from "./systems/blobSystem.js";
 import { updateAlienDay } from "./systems/alienSystem.js";
-import { createPopulationAliensChart, createPopulationBlobsChart } from "./ui/populationChart.js";
+import { createPopulationChart } from "./ui/populationChart.js";
 import { cellKey } from "./systems/worldOps.js";
+import { createAudioManager } from "./audio/audioManager.js";
+import { createIntroScreen } from "./ui/introScreen.js";
+import { createShopBar } from "./ui/shopBar.js";
+import { createWinLoseScreen } from "./ui/winLoseScreen.js";
 
+// =========================
+// Eléments DOM
+// =========================
 const canvas = document.getElementById("game");
-const statsSummaryEl = document.getElementById("statsSummary");
+const eventLogEl = document.getElementById("eventLog");
+const speedBadgeEl = document.getElementById("speedBadge");
+const pauseBadgeEl = document.getElementById("pauseBadge");
+const phaseLabelEl = document.getElementById("phaseLabel");
+const countAliensEl = document.getElementById("countAliens");
+const countBlobsEl  = document.getElementById("countBlobs");
 
 // =========================
 // Etat de vue + config centralisée
 // =========================
 const viewState = createViewState();
 const labels = viewState.config.labels;
+const SHOP_COSTS = viewState.config.shop.costs;
+const POINTS_PER_TICK = viewState.config.shop.pointsPerTick;
+const WIN_ALIENS = viewState.config.shop.winAliens;
+const GRACE_TICKS = viewState.config.shop.graceTicks;
 
 // =========================
 // Création du monde
@@ -26,15 +42,16 @@ const world = createWorld({
   gridH: viewState.config.world.gridH,
   dayTicks: viewState.config.world.dayTicks,
   nightTicks: viewState.config.world.nightTicks,
-  seed: crypto.getRandomValues(new Uint32Array(1))[0], // seed aléatoire
+  seed: crypto.getRandomValues(new Uint32Array(1))[0],
 });
 
 world.rand = mulberry32(world.seed);
 
 // =========================
-// Création du renderer actif
+// Renderer + audio
 // =========================
 const renderer = createRenderer(canvas, world, viewState);
+const audio = createAudioManager();
 
 // =========================
 // Spawn initial
@@ -43,123 +60,306 @@ spawnInitialAliens(world, viewState.config.initialAliens);
 spawnInitialBlobs(world, viewState.config.initialBlobs);
 
 // =========================
-// Timing
+// Graphes de population
 // =========================
-const TICK_MS = viewState.config.timing.tickMs;
-const SAMPLE_EVERY = viewState.config.timing.sampleEvery;
-const MAX_POINTS = viewState.config.timing.maxPoints;
+const MAX_POINTS = 300;   // nb de points conservés dans le graphique
+const popChart = createPopulationChart();
+
+// =========================
+// Journal d'événements
+// =========================
+const eventMessages = [];
+
+function logEvent(msg) {
+  eventMessages.unshift(msg);
+  if (eventMessages.length > 7) eventMessages.pop();
+  if (eventLogEl) {
+    eventLogEl.innerHTML = eventMessages
+      .map((m) => `<div class="evt">${m}</div>`)
+      .join("");
+  }
+}
 
 // =========================
 // UI stats
 // =========================
-function updateStatsUI(world, phase) {
-  const alienCount = world.aliens.size;
-
-  let avgE = 0;
-  let avgEmax = 0;
-  let avgAge = 0;
-  let avgLifespan = 0;
-  let avgR = 0;
-  let avgEnergyDecayPerTick = 0;
-
-  if (alienCount > 0) {
-    for (const h of world.aliens.values()) {
-      avgE += h.E;
-      avgEmax += h.Emax;
-      avgAge += h.age;
-      avgLifespan += h.lifespan;
-      avgR += h.R;
-      avgEnergyDecayPerTick += h.energyDecayPerTick;
-    }
-
-    avgE /= alienCount;
-    avgEmax /= alienCount;
-    avgAge /= alienCount;
-    avgLifespan /= alienCount;
-    avgR /= alienCount;
-    avgEnergyDecayPerTick /= alienCount;
+function updateStatsUI(phase) {
+  const isNight = phase.name === "NIGHT";
+  if (phaseLabelEl) {
+    phaseLabelEl.textContent = isNight ? `Nuit — Jour ${world.day}` : `Jour ${world.day}`;
+    phaseLabelEl.className = isNight ? "night" : "";
   }
-
-  const linesStats = [];
-  linesStats.push(`Seed=${world.seed}`);
-  linesStats.push(`day=${world.day}`);
-  linesStats.push(`phase=${phase.name} (t=${phase.tInPhase}/${phase.duration})`);
-  linesStats.push(`${labels.aliens}=${world.aliens.size}`);
-  linesStats.push(`${labels.blobs}=${world.blobs.size}`);
-  linesStats.push(`${labels.plants}=${world.plants.size}`);
-
-  linesStats.push(`avgE=${avgE.toFixed(1)} / ${avgEmax.toFixed(1)}`);
-  linesStats.push(`avgAge=${avgAge.toFixed(1)} / ${avgLifespan.toFixed(1)}`);
-  linesStats.push(`avgVision=${avgR.toFixed(2)}`);
-  linesStats.push(`avgEnergyDecayPerTick=${avgEnergyDecayPerTick.toFixed(2)}`);
-
-  statsSummaryEl.textContent = linesStats.join("\n");
+  if (countAliensEl) countAliensEl.textContent = world.aliens.size;
+  if (countBlobsEl)  countBlobsEl.textContent  = world.blobs.size;
+  if (speedBadgeEl)  speedBadgeEl.textContent   = `×${viewState.speedMultiplier}`;
+  if (pauseBadgeEl)  pauseBadgeEl.style.display  = viewState.paused ? "inline-block" : "none";
 }
 
 // =========================
-// Jour / Nuit
+// Phase jour / nuit
 // =========================
-function getPhase(world) {
+function getPhase() {
+  if (viewState.forceNight) {
+    return { name: "NIGHT", tInPhase: 0, duration: 1 };
+  }
   const cycle = world.dayTicks + world.nightTicks;
   const t = world.tick % cycle;
-
   if (t < world.dayTicks) {
     return { name: "DAY", tInPhase: t, duration: world.dayTicks };
-  } else {
-    return { name: "NIGHT", tInPhase: t - world.dayTicks, duration: world.nightTicks };
   }
+  return { name: "NIGHT", tInPhase: t - world.dayTicks, duration: world.nightTicks };
 }
 
 // =========================
-// Graphes
+// Placement d'entités via shop
 // =========================
-const popChartAliens = createPopulationAliensChart();
-const popChartBlobs = createPopulationBlobsChart();
+function tryPlacePlant(x, y) {
+  const gx = Math.max(0, Math.min(world.gridW - 1, x));
+  const gy = Math.max(0, Math.min(world.gridH - 1, y));
+  return spawnPlantAt(world, gx, gy, viewState.config.plants);
+}
+
+function tryPlaceBlob(x, y) {
+  const gx = Math.max(0, Math.min(world.gridW - 1, x));
+  const gy = Math.max(0, Math.min(world.gridH - 1, y));
+  const key = cellKey(world, gx, gy);
+  if (world.occupiedBlobs.has(key) || world.occupiedAliens.has(key)) return false;
+  const template = viewState.config.initialBlobs.createBlobTemplate(world);
+  template.E = Math.ceil(template.Emax * 0.8);
+  makeBlob(world, gx, gy, template);
+  world.occupiedBlobs.add(key);
+  return true;
+}
+
+function tryPlaceAlien(x, y) {
+  const gx = Math.max(0, Math.min(world.gridW - 1, x));
+  const gy = Math.max(0, Math.min(world.gridH - 1, y));
+  const key = cellKey(world, gx, gy);
+  if (world.occupiedAliens.has(key) || world.occupiedBlobs.has(key)) return false;
+  const template = viewState.config.initialAliens.createAlienTemplate(world);
+  makeAlien(world, gx, gy, template);
+  world.occupiedAliens.add(key);
+  return true;
+}
 
 // =========================
-// Boucle principale
+// Gestion pause / vitesse
 // =========================
-setInterval(() => {
-  const phase = getPhase(world);
+const BASE_TICK_MS = viewState.config.timing.tickMs;
+let gameInterval = null;
+
+function applySpeed(multiplier) {
+  viewState.speedMultiplier = multiplier;
+  if (gameInterval !== null) {
+    clearInterval(gameInterval);
+    gameInterval = setInterval(tick, Math.floor(BASE_TICK_MS / multiplier));
+  }
+  logEvent(`Vitesse ×${multiplier}`);
+}
+
+// =========================
+// Contrôles clavier
+// =========================
+function setupKeyboard() {
+  window.addEventListener("keydown", (e) => {
+    if (e.code === "Space") {
+      e.preventDefault();
+      viewState.paused = !viewState.paused;
+      audio.resume();
+      logEvent(viewState.paused ? "Simulation en pause" : "Simulation reprise");
+      return;
+    }
+    if (e.code === "Digit1") { applySpeed(1); return; }
+    if (e.code === "Digit2") { applySpeed(2); return; }
+    if (e.code === "Digit3") { applySpeed(4); return; }
+  });
+}
+
+// =========================
+// Tick principal
+// =========================
+let shopBar = null;
+let winLoseScreen = null;
+
+function tick() {
+  if (viewState.paused) {
+    audio.stopAllBlobSteps();
+    renderer.renderWorld(world, viewState);
+    return;
+  }
+
+  // Economie — points passifs
+  viewState.points += POINTS_PER_TICK;
+  viewState._alienCount = world.aliens.size;
+  if (shopBar) shopBar.refresh();
+
+  // Graphique — échantillonnage toutes les 5 ticks
+  if (world.tick % 5 === 0) {
+    popChart.pushPoint(world.tick, world.aliens.size, world.blobs.size);
+    popChart.keepLast(MAX_POINTS);
+  }
+
+  // Vérification victoire / défaite
+  if (!viewState.gameOver && world.tick > GRACE_TICKS) {
+    if (world.aliens.size >= WIN_ALIENS) {
+      viewState.gameOver = true;
+      viewState.paused = true;
+      if (winLoseScreen) winLoseScreen.showWin();
+      audio.playBirth();
+      logEvent(`VICTOIRE — ${WIN_ALIENS} aliens dominent la planète !`);
+    } else if (world.aliens.size === 0) {
+      viewState.gameOver = true;
+      viewState.paused = true;
+      if (winLoseScreen) winLoseScreen.showLose();
+      audio.playDeath();
+      logEvent(`DÉFAITE — tous les aliens ont disparu.`);
+    }
+  }
+
+  const phase = getPhase();
+  const wasNight = viewState.isNight;
   viewState.isNight = phase.name === "NIGHT";
+
+  if (!wasNight && viewState.isNight) {
+    audio.playDayNight();
+  }
 
   if (phase.name === "DAY") {
     updatePlantSpawns(world, viewState.config.plants);
     updatePlantsAging(world);
 
+    const alienIdsBefore = new Set(world.aliens.keys());
     for (const alien of world.aliens.values()) {
+      const prevAction = alien.lastAction;
       updateAlienDay(world, alien);
+      if (alien.lastAction !== prevAction && alien.lastAction?.tick === world.tick) {
+        const vol = renderer.getAudioVolume ? renderer.getAudioVolume(alien.x, alien.y) : 1;
+        if (alien.lastAction.type === "eatBlob") audio.playEatBlob(vol * 0.55);
+        else if (alien.lastAction.type === "eatPlant") audio.playEatPlant(vol * 0.35);
+      }
+    }
+    for (const [id, alien] of world.aliens.entries()) {
+      if (!alienIdsBefore.has(id)) {
+        const vol = renderer.getAudioVolume ? renderer.getAudioVolume(alien.x, alien.y) : 1;
+        audio.playBirth(vol * 0.45);
+      }
     }
 
-    for (const blob of world.blobs.values()) {
+    const blobIdsBefore = new Set(world.blobs.keys());
+    const movingBlobs   = new Set();
+    for (const [id, blob] of world.blobs.entries()) {
+      const prevX      = blob.x;
+      const prevY      = blob.y;
+      const prevAction = blob.lastAction;
       updateBlobDay(world, blob);
+      const vol = renderer.getAudioVolume ? renderer.getAudioVolume(blob.x, blob.y) : 1;
+      if (blob.x !== prevX || blob.y !== prevY) {
+        movingBlobs.add(id);
+        audio.startBlobStep(id, vol * 0.3);
+      }
+      if (blob.lastAction !== prevAction && blob.lastAction?.tick === world.tick) {
+        if (blob.lastAction.type === "eatPlant") audio.playEatPlant(vol * 0.35);
+      }
     }
+    for (const [id, blob] of world.blobs.entries()) {
+      if (!blobIdsBefore.has(id)) {
+        const vol = renderer.getAudioVolume ? renderer.getAudioVolume(blob.x, blob.y) : 1;
+        audio.playBirth(vol * 0.45);
+      }
+    }
+    audio.stopBlobStepsExcept(movingBlobs);
+
   } else {
+    audio.stopAllBlobSteps();
     if (phase.tInPhase === 0) {
-      // Supprimer les agents sans energie
+      let deadCount = 0;
       for (const [id, alien] of world.aliens.entries()) {
         if (alien.E <= 0) {
-          console.log(`alien#${alien.id} a disparu`);
+          const vol = renderer.getAudioVolume ? renderer.getAudioVolume(alien.x, alien.y) : 1;
+          audio.playDeath(vol * 0.5);
           const key = cellKey(world, alien.x, alien.y);
           world.occupiedAliens.delete(key);
           world.aliens.delete(id);
+          deadCount++;
         }
+      }
+      if (deadCount > 0) {
+        logEvent(`${deadCount} alien(s) ont disparu cette nuit`);
       }
 
       world.day++;
-
-      if (world.day % SAMPLE_EVERY === 0) {
-        popChartAliens.pushPoint(world.day, world.aliens.size);
-        popChartAliens.keepLast(MAX_POINTS);
-
-        popChartBlobs.pushPoint(world.day, world.blobs.size);
-        popChartBlobs.keepLast(MAX_POINTS);
-      }
     }
   }
 
-  updateStatsUI(world, phase);
+  updateStatsUI(phase);
   renderer.renderWorld(world, viewState);
-
   world.tick++;
-}, TICK_MS);
+}
+
+// =========================
+// Démarrage du jeu (après écran d'intro)
+// =========================
+function startGame() {
+  audio.resume();
+  audio.startAmbient();
+
+  setupKeyboard();
+
+  shopBar = createShopBar(viewState, (isCameraMode) => {
+    if (renderer.setCameraControl) renderer.setCameraControl(isCameraMode);
+  });
+  shopBar.refresh();
+  // Démarre en mode caméra (par défaut)
+  if (renderer.setCameraControl) renderer.setCameraControl(true);
+
+  winLoseScreen = createWinLoseScreen(() => {
+    location.reload();
+  });
+
+  // Clic droit → annuler sélection + retour mode caméra
+  canvas.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    if (viewState.selectedShopItem) {
+      viewState.selectedShopItem = null;
+      viewState.cameraMode = true;
+      if (renderer.setCameraControl) renderer.setCameraControl(true);
+      shopBar.refresh();
+    }
+  });
+
+  // Clic sur terrain → placer l'entité sélectionnée
+  if (renderer.setGroundClickCallback) {
+    renderer.setGroundClickCallback((x, z) => {
+      const entity = viewState.selectedShopItem;
+      if (!entity) return;
+      const cost = SHOP_COSTS[entity];
+      if (viewState.points < cost) return;
+
+      let placed = false;
+      const spawnVol = renderer.getAudioVolume ? renderer.getAudioVolume(x, z) : 1;
+      if (entity === "blob") {
+        placed = tryPlaceBlob(x, z);
+        if (placed) audio.playSpawn(spawnVol * 0.5);
+      } else if (entity === "alien") {
+        placed = tryPlaceAlien(x, z);
+        if (placed) audio.playSpawn(spawnVol * 0.5);
+      }
+
+      if (placed) {
+        viewState.points -= cost;
+        const name = entity.charAt(0).toUpperCase() + entity.slice(1);
+        logEvent(`${name} placé(e) en (${x}, ${z})`);
+        shopBar.refresh();
+      }
+    });
+  }
+
+  logEvent("Bienvenue — vous êtes le Dieu de ce monde.");
+
+  gameInterval = setInterval(tick, BASE_TICK_MS);
+}
+
+// =========================
+// Lancement de l'écran d'intro
+// =========================
+createIntroScreen(startGame);

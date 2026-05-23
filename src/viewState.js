@@ -11,12 +11,24 @@ export function createViewState() {
     showWorldBorder: true,
 
     // =========================
+    // Etat de jeu
+    // =========================
+    paused: false,
+    speedMultiplier: 1,
+    forceNight: false,
+    points: 150,
+    selectedShopItem: null,   // "plant" | "blob" | "alien" | null
+    gameOver: false,
+    cameraMode: true,         // true = clic gauche orbite | false = clic gauche place
+    _alienCount: 0,           // cache mis à jour chaque tick pour shopBar
+
+    // =========================
     // Paramétrage centralisé
     // =========================
     config: {
       world: {
-        gridW: 120,
-        gridH: 80,
+        gridW: 240,
+        gridH: 160,
         dayTicks: 100,
         nightTicks: 1,
       },
@@ -63,12 +75,14 @@ export function createViewState() {
 
         createBlobTemplate: (world) => {
           return {
+            E:    15,                // énergie initiale (75% de Emax)
             Emax: 20,
             lifespan: 1400,
             valE: 50,
             duplicationCost: 16,
             duplicationTickDelay: 350,
             duplicationTick: 0,
+            energyDecayPerTick: 0.015,
           };
         },
       },
@@ -77,6 +91,18 @@ export function createViewState() {
         aliens: "Aliens",
         blobs: "Blobs",
         plants: "Plants",
+      },
+
+      shop: {
+        startingPoints: 150,
+        pointsPerTick: 2,
+        costs: {
+          plant: 30,
+          blob: 120,
+          alien: 350,
+        },
+        winAliens: 50,
+        graceTicks: 50,
       },
     },
   };

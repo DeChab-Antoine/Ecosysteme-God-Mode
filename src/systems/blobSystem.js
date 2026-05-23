@@ -1,6 +1,8 @@
 import { cellKey, dist2, clamp, moveTo, findFreeNeighborCell, removePlantAt, removeBlobAt } from "./worldOps.js";
 
-// Cree une blob mobile. Le type interne "blob" reste pour compatibilite.
+const BLOB_VISION_RADIUS = 18;  // champ de vision pour chercher les plantes
+const BLOB_FEAR_RADIUS   = 8;   // rayon de détection des aliens
+
 export function makeBlob(world, x, y, template) {
   const id = world.nextBlobId++;
 
@@ -10,30 +12,27 @@ export function makeBlob(world, x, y, template) {
     y,
     type: "blob",
 
-    // Energie
-    E: template.E ?? 0,
+    E:    template.E    ?? Math.ceil((template.Emax ?? 20) * 0.75),
     Emax: template.Emax,
 
-    // Energie recuperee par une alien qui absorbe la blob
+    // Energie récupérée par l'alien qui absorbe ce blob
     valE: template.valE,
 
-    // Age
-    age: template.age ?? 0,
+    age:      template.age      ?? 0,
     lifespan: template.lifespan,
 
-    // Duplication
-    duplicationCost: template.duplicationCost ?? Math.ceil(template.Emax * 0.5),
-    duplicationTick: template.duplicationTick ?? 0,
+    duplicationCost:      template.duplicationCost      ?? Math.ceil(template.Emax * 0.5),
+    duplicationTick:      template.duplicationTick      ?? 0,
     duplicationTickDelay: template.duplicationTickDelay ?? 250,
+
+    energyDecayPerTick: template.energyDecayPerTick ?? 0.015,
   };
 
   world.blobs.set(id, blob);
 }
 
-// Essaie de placer une blob sur une case libre
 function trySpawnBlob(world, x, y, createBlobTemplate) {
   const key = cellKey(world, x, y);
-
   if (world.occupiedAliens.has(key)) return false;
   if (world.occupiedPlants.has(key)) return false;
   if (world.occupiedBlobs.has(key)) return false;
@@ -46,76 +45,82 @@ function trySpawnBlob(world, x, y, createBlobTemplate) {
 
 export function spawnInitialBlobs(world, config) {
   const { count, maxAttempts, createBlobTemplate } = config;
-
-  let spawned = 0;
-  let attempts = 0;
-
+  let spawned = 0, attempts = 0;
   while (spawned < count && attempts < maxAttempts) {
     attempts++;
-
     const x = Math.floor(world.rand() * world.gridW);
     const y = Math.floor(world.rand() * world.gridH);
-
-    const ok = trySpawnBlob(world, x, y, createBlobTemplate);
-    if (ok) spawned++;
+    if (trySpawnBlob(world, x, y, createBlobTemplate)) spawned++;
   }
 }
 
-// Cherche le plant nutritif le plus proche
-function findNearestPlant(world, blob) {
-  let best = null;
-  let bestD2 = Infinity;
+// =========================
+// Perception
+// =========================
 
+// Plante la plus proche dans le champ de vision (pas omniscient)
+function findNearestPlantInVision(world, blob) {
+  const R2 = BLOB_VISION_RADIUS * BLOB_VISION_RADIUS;
+  let best = null, bestD2 = Infinity;
   for (const c of world.plants.values()) {
     const d2 = dist2(blob.x, blob.y, c.x, c.y);
-    if (d2 < bestD2) {
-      bestD2 = d2;
-      best = c;
-    }
+    if (d2 <= R2 && d2 < bestD2) { bestD2 = d2; best = c; }
   }
-
   return best;
 }
 
-// Mouvement d'un pas vers une cible (x,y)
+// Alien la plus proche dans le rayon de peur
+function findNearestAlienThreat(world, blob) {
+  const R2 = BLOB_FEAR_RADIUS * BLOB_FEAR_RADIUS;
+  let best = null, bestD2 = Infinity;
+  for (const a of world.aliens.values()) {
+    const d2 = dist2(blob.x, blob.y, a.x, a.y);
+    if (d2 <= R2 && d2 < bestD2) { bestD2 = d2; best = a; }
+  }
+  return best;
+}
+
+// =========================
+// Mouvement
+// =========================
+
 function stepTowards(world, blob, tx, ty) {
   const dx = tx - blob.x;
   const dy = ty - blob.y;
+  const sx = Math.sign(dx);
+  const sy = Math.sign(dy);
 
-  const primary = (Math.abs(dx) >= Math.abs(dy))
-    ? { x: blob.x + Math.sign(dx), y: blob.y }
-    : { x: blob.x, y: blob.y + Math.sign(dy) };
+  if (sx !== 0 && sy !== 0 && moveTo(world, blob, blob.x + sx, blob.y + sy)) return;
 
+  const primary   = Math.abs(dx) >= Math.abs(dy)
+    ? { x: blob.x + sx, y: blob.y }
+    : { x: blob.x, y: blob.y + sy };
   if (moveTo(world, blob, primary.x, primary.y)) return;
 
-  const secondary = (Math.abs(dx) >= Math.abs(dy))
-    ? { x: blob.x, y: blob.y + Math.sign(dy) }
-    : { x: blob.x + Math.sign(dx), y: blob.y };
-
+  const secondary = Math.abs(dx) >= Math.abs(dy)
+    ? { x: blob.x, y: blob.y + sy }
+    : { x: blob.x + sx, y: blob.y };
   if (moveTo(world, blob, secondary.x, secondary.y)) return;
 
   randomStep(world, blob);
 }
 
 function randomStep(world, blob) {
-  const r = Math.floor(world.rand() * 4);
-  let nx = blob.x;
-  let ny = blob.y;
-
-  if (r === 0) nx += 1;
-  else if (r === 1) nx -= 1;
-  else if (r === 2) ny += 1;
-  else ny -= 1;
-
-  moveTo(world, blob, nx, ny);
+  const dirs = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
+  const [dx, dy] = dirs[Math.floor(world.rand() * dirs.length)];
+  moveTo(world, blob, blob.x + dx, blob.y + dy);
 }
+
+// =========================
+// Reproduction
+// =========================
 
 function canDuplicate(blob) {
   return (
     Number.isFinite(blob.E) &&
     Number.isFinite(blob.Emax) &&
     blob.duplicationTick >= blob.duplicationTickDelay &&
-    blob.E >= (blob.Emax * 0.95)
+    blob.E >= blob.Emax * 0.95
   );
 }
 
@@ -123,31 +128,32 @@ export function tryDuplicate(world, parent) {
   const spot = findFreeNeighborCell(world, parent.x, parent.y);
   if (!spot) return false;
 
-  const duplicationCost = parent.duplicationCost ?? Math.ceil(parent.Emax * 0.5);
-  const childTemplate = {
-    E: duplicationCost,
+  const cost = parent.duplicationCost ?? Math.ceil(parent.Emax * 0.5);
+  makeBlob(world, spot.x, spot.y, {
+    E:    cost,
     Emax: parent.Emax,
     valE: parent.valE,
-    age: 0,
-    lifespan: parent.lifespan,
-    duplicationCost,
-    duplicationTick: 0,
+    age:  0,
+    lifespan:             parent.lifespan,
+    duplicationCost:      cost,
+    duplicationTick:      0,
     duplicationTickDelay: parent.duplicationTickDelay,
-  };
-
-  makeBlob(world, spot.x, spot.y, childTemplate);
+    energyDecayPerTick:   parent.energyDecayPerTick,
+  });
   world.occupiedBlobs.add(cellKey(world, spot.x, spot.y));
 
-  parent.E = clamp(parent.E - duplicationCost, 0, parent.Emax);
+  parent.E = clamp(parent.E - cost, 0, parent.Emax);
   parent.duplicationTick = 0;
-
   return true;
 }
 
-// Un tick "JOUR" pour 1 blob
+// =========================
+// Tick principal
+// =========================
+
 export function updateBlobDay(world, blob) {
+  // Mort de vieillesse
   if (blob.age >= blob.lifespan) {
-    console.log(`blob#${blob.id} s'est dissipee`);
     removeBlobAt(world, blob);
     return;
   }
@@ -155,18 +161,31 @@ export function updateBlobDay(world, blob) {
   blob.age++;
   blob.duplicationTick++;
 
-  const target = findNearestPlant(world, blob);
+  // Decay d'énergie passif
+  blob.E = clamp(blob.E - (blob.energyDecayPerTick ?? 0.015), 0, blob.Emax);
 
-  if (target) {
-    stepTowards(world, blob, target.x, target.y);
+  // --- Décision de mouvement ---
+  const threat = findNearestAlienThreat(world, blob);
+  const starving = blob.E < blob.Emax * 0.25;
+
+  if (threat && !starving) {
+    // Fuite : direction opposée à la menace
+    // Si en train de mourir de faim, le blob prend le risque d'ignorer la menace
+    const fleeX = blob.x + Math.sign(blob.x - threat.x) * 3;
+    const fleeY = blob.y + Math.sign(blob.y - threat.y) * 3;
+    stepTowards(world, blob, fleeX, fleeY);
   } else {
-    randomStep(world, blob);
+    const target = findNearestPlantInVision(world, blob);
+    if (target) {
+      stepTowards(world, blob, target.x, target.y);
+    } else {
+      randomStep(world, blob);
+    }
   }
 
-  if (canDuplicate(blob)) {
-    tryDuplicate(world, blob);
-  }
+  if (canDuplicate(blob)) tryDuplicate(world, blob);
 
+  // Manger une plante si on est sur la même case
   const key = cellKey(world, blob.x, blob.y);
   if (world.occupiedPlants.has(key)) {
     const plant = world.plants.get(key);
@@ -174,7 +193,9 @@ export function updateBlobDay(world, blob) {
       removePlantAt(world, blob.x, blob.y);
       blob.E = clamp(blob.E + plant.valE, 0, blob.Emax);
       blob.lastAction = { type: "eatPlant", tick: world.tick };
-      console.log(`blob#${blob.id} absorbe un plant de val = ${plant.valE}`);
     }
   }
+
+  // Mort par famine
+  if (blob.E <= 0) removeBlobAt(world, blob);
 }

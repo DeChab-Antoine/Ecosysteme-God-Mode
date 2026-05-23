@@ -1,108 +1,76 @@
-export function createPopulationAliensChart() {
-  const ctx = document.getElementById("popChartAliens");
+export function createPopulationChart() {
+  const ctx = document.getElementById("popChart");
+  if (!ctx) return { pushPoint() {}, keepLast() {} };
 
-  const dataAliens = {
+  const data = {
     labels: [],
-    datasets: [{
-      label: "Aliens",
-      data: [],
-      tension: 0.25,
-      borderColor: "rgb(215, 152, 152)",      
-      backgroundColor: "rgba(215, 152, 152, 0.32)",
-      pointRadius: 0,
-      borderWidth: 2,
-      fill: true
-    }]
+    datasets: [
+      {
+        label: "Aliens",
+        data: [],
+        tension: 0.3,
+        borderColor: "rgb(200, 112, 240)",
+        backgroundColor: "rgba(200, 112, 240, 0.12)",
+        pointRadius: 0,
+        borderWidth: 1.5,
+        fill: false,
+      },
+      {
+        label: "Blobs",
+        data: [],
+        tension: 0.3,
+        borderColor: "rgb(255, 70, 155)",
+        backgroundColor: "rgba(255, 70, 155, 0.10)",
+        pointRadius: 0,
+        borderWidth: 1.5,
+        fill: false,
+      },
+    ],
   };
 
-  const chartAliens = new Chart(ctx, {
+  const chart = new Chart(ctx, {
     type: "line",
-    data: dataAliens,
+    data,
     options: {
       responsive: true,
       animation: false,
       plugins: {
-        legend: { display: false },
-        title: {
+        legend: {
           display: true,
-          text: "Aliens",
-          padding: { top: 6, bottom: 6 }
-        }
+          position: "top",
+          labels: {
+            color: "#6070a8",
+            font: { size: 9 },
+            boxWidth: 10,
+            padding: 6,
+          },
+        },
+        title: { display: false },
       },
       scales: {
-        x: { display: true, title: { display: true, text: "Days" } },
-        y: { beginAtZero: true, ticks: { precision: 0 }, title: { display: true} }
-      }
-    }
+        x: { display: false },
+        y: {
+          beginAtZero: true,
+          ticks: { precision: 0, color: "#4858a0", font: { size: 9 }, maxTicksLimit: 4 },
+          grid: { color: "rgba(80, 100, 180, 0.08)" },
+        },
+      },
+    },
   });
 
   return {
-    pushPoint(t, pop) {
-      dataAliens.labels.push(t);
-      dataAliens.datasets[0].data.push(pop);
-      chartAliens.update("none");
+    pushPoint(tick, nAliens, nBlobs) {
+      data.labels.push(tick);
+      data.datasets[0].data.push(nAliens);
+      data.datasets[1].data.push(nBlobs);
+      chart.update("none");
     },
     keepLast(maxPoints) {
-      const extra = dataAliens.labels.length - maxPoints;
+      const extra = data.labels.length - maxPoints;
       if (extra > 0) {
-        dataAliens.labels.splice(0, extra);
-        dataAliens.datasets[0].data.splice(0, extra);
+        data.labels.splice(0, extra);
+        for (const ds of data.datasets) ds.data.splice(0, extra);
       }
-    }
-  };
-}
-
-
-export function createPopulationBlobsChart() {
-  const ctx = document.getElementById("popChartBlobs");
-
-  const dataBlobs = {
-    labels: [],
-    datasets: [{
-      label: "Blobs",
-      data: [],
-      tension: 0.25,
-      borderColor: "rgb(255, 0, 136)",      
-      backgroundColor: "rgba(255, 0, 136, 0.25)",
-      pointRadius: 0,
-      borderWidth: 2,
-      fill: true
-    }]
-  };
-
-  const chartBlobs = new Chart(ctx, {
-    type: "line",
-    data: dataBlobs,
-    options: {
-      responsive: true,
-      animation: false,
-      plugins: {
-        legend: { display: false },
-        title: {
-          display: true,
-          text: "Blobs",
-          padding: { top: 6, bottom: 6 }
-        }
-      },
-      scales: {
-        x: { display: true, title: { display: true, text: "Days" } },
-        y: { beginAtZero: true, ticks: { precision: 0 }, title: { display: true} }
-      }
-    }
-  });
-
-  return {
-    pushPoint(t, pop) {
-      dataBlobs.labels.push(t);
-      dataBlobs.datasets[0].data.push(pop);
-      chartBlobs.update("none");
     },
-    keepLast(maxPoints) {
-      const extra = dataBlobs.labels.length - maxPoints;
-      if (extra > 0) {
-        dataBlobs.labels.splice(0, extra);
-        dataBlobs.datasets[0].data.splice(0, extra);
-      }
-    }
   };
 }

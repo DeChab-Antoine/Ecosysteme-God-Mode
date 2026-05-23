@@ -49,6 +49,13 @@ export function updatePlantSpawns(world, config) {
 }
 
 /**
+ * Spawn direct d'un plant en (x,y) — utilisé par le mode Dieu.
+ */
+export function spawnPlantAt(world, x, y, config) {
+  return trySpawnPlant(world, x, y, config);
+}
+
+/**
  * Vieillissement et dissipation des Plants nutritifs.
  */
 export function updatePlantsAging(world) {

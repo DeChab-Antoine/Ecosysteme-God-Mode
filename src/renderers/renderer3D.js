@@ -1,6 +1,4 @@
 const DECORATION_ASSETS = {
-  smallRock: "Rock.glb",
-  largeRock: "RockLarge.glb",
   bush: "Bush.glb",
   tree: "Tree.glb",
 };
@@ -12,57 +10,29 @@ const ENTITY_ASSETS = {
 };
 
 const ASSET_ROOT_URL = "../assets/";
+const DEATH_ANIMATION_MS = 1800;
+const CORPSE_REMAIN_MS = 2200;
 
-const STATIC_DECORATIONS = [
-  ...[
-    [12, 11, 1.35, 0.2], [28, 18, 1.6, 1.4], [45, 10, 1.2, 2.1],
-    [68, 17, 1.45, 0.8], [96, 13, 1.7, 1.9], [111, 28, 1.25, 2.7],
-    [18, 58, 1.5, 0.6], [38, 70, 1.2, 2.0], [64, 61, 1.65, 1.1],
-    [87, 70, 1.35, 0.4], [108, 57, 1.55, 2.3], [52, 38, 1.25, 1.6],
-  ].map(([x, y, scale, rotation]) => ({
-    kind: "largeRock",
-    x,
-    y,
-    scale: scale * 0.5,
-    rotation,
-    blocks: true,
-  })),
-
-  ...[
-    [7, 17, 0.45, 0.1], [16, 19, 0.55, 1.7], [24, 9, 0.5, 2.5],
-    [34, 24, 0.42, 0.8], [51, 17, 0.5, 1.2], [59, 7, 0.44, 2.6],
-    [75, 9, 0.5, 1.9], [84, 23, 0.46, 0.5], [103, 22, 0.52, 2.2],
-    [115, 15, 0.42, 1.1], [9, 39, 0.48, 2.0], [23, 43, 0.54, 0.3],
-    [35, 35, 0.44, 1.5], [47, 50, 0.52, 2.8], [61, 45, 0.43, 0.7],
-    [73, 37, 0.5, 2.4], [83, 50, 0.46, 1.4], [99, 42, 0.55, 0.9],
-    [113, 44, 0.42, 2.9], [8, 69, 0.5, 0.6], [27, 67, 0.46, 2.1],
-    [45, 74, 0.55, 1.2], [57, 66, 0.44, 2.7], [75, 72, 0.5, 0.4],
-    [93, 61, 0.48, 1.8], [116, 68, 0.52, 2.5],
-  ].map(([x, y, scale, rotation]) => ({
-    kind: "smallRock",
-    x,
-    y,
-    scale: scale * 0.6,
-    rotation,
-    blocks: false,
-  })),
-
-  ...[
-    [10, 27, 0.75, 0.4], [15, 31, 0.65, 1.7], [26, 30, 0.7, 2.4],
-    [39, 14, 0.68, 0.8], [55, 25, 0.72, 1.5], [72, 28, 0.62, 2.2],
-    [90, 27, 0.76, 0.6], [106, 37, 0.7, 1.9], [14, 50, 0.7, 2.8],
-    [31, 55, 0.64, 0.3], [43, 62, 0.74, 1.1], [58, 55, 0.66, 2.5],
-    [76, 57, 0.72, 0.7], [91, 50, 0.62, 1.4], [104, 65, 0.76, 2.1],
-    [116, 53, 0.64, 0.9], [49, 31, 0.58, 2.6], [69, 43, 0.66, 1.0],
-  ].map(([x, y, scale, rotation]) => ({ kind: "bush", x, y, scale, rotation, blocks: false })),
-
-  ...[
-    [18, 13, 1.0, 0.2], [36, 18, 1.15, 1.1], [62, 12, 0.95, 2.6],
-    [89, 17, 1.08, 0.7], [109, 18, 0.95, 1.9], [13, 62, 1.12, 2.2],
-    [33, 60, 1.0, 0.5], [55, 69, 1.08, 1.5], [81, 64, 0.96, 2.8],
-    [101, 72, 1.14, 0.9], [21, 39, 0.95, 1.8], [98, 48, 1.05, 2.4],
-  ].map(([x, y, scale, rotation]) => ({ kind: "tree", x, y, scale, rotation, blocks: true })),
-];
+// Décorations générées procéduralement (pas de tableau statique)
+function generateDecorations(gW, gH) {
+  // LCG pseudo-random reproductible
+  let s = 0xDEAD_BEEF;
+  function r() {
+    s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+    return s / 0xFFFF_FFFF;
+  }
+  const MARGIN = 4;
+  const list = [];
+  const treeCount  = Math.floor(gW * gH / 640);   // ~60 arbres sur 240×160
+  const bushCount  = Math.floor(gW * gH / 380);   // ~100 buissons sur 240×160
+  for (let i = 0; i < treeCount; i++) {
+    list.push({ kind: "tree",  x: MARGIN + r() * (gW - MARGIN * 2), y: MARGIN + r() * (gH - MARGIN * 2), scale: 0.9 + r() * 0.6, rotation: r() * Math.PI * 2, blocks: true });
+  }
+  for (let i = 0; i < bushCount; i++) {
+    list.push({ kind: "bush",  x: MARGIN + r() * (gW - MARGIN * 2), y: MARGIN + r() * (gH - MARGIN * 2), scale: 0.7 + r() * 0.5, rotation: r() * Math.PI * 2, blocks: false });
+  }
+  return list;
+}
 
 export function createRenderer3D(canvas, { gridW, gridH, cellSize }) {
   // =========================
@@ -117,9 +87,9 @@ export function createRenderer3D(canvas, { gridW, gridH, cellSize }) {
     new BABYLON.Vector3(0, 1, 0),
     scene
   );
-  hemiLight.intensity = 0.75;
-  hemiLight.diffuse = new BABYLON.Color3(0.62, 0.75, 1.0);
-  hemiLight.groundColor = new BABYLON.Color3(0.13, 0.09, 0.18);
+  hemiLight.intensity = 1.1;
+  hemiLight.diffuse = new BABYLON.Color3(0.72, 0.82, 1.0);
+  hemiLight.groundColor = new BABYLON.Color3(0.22, 0.16, 0.30);
 
   const dirLight = new BABYLON.DirectionalLight(
     "dirLight",
@@ -127,74 +97,83 @@ export function createRenderer3D(canvas, { gridW, gridH, cellSize }) {
     scene
   );
   dirLight.position = new BABYLON.Vector3(gridW * 0.25, 42, gridH * 0.15);
-  dirLight.intensity = 1.1;
-  dirLight.diffuse = new BABYLON.Color3(1.0, 0.78, 0.52);
-  dirLight.specular = new BABYLON.Color3(0.5, 0.42, 0.32);
+  dirLight.intensity = 1.5;
+  dirLight.diffuse = new BABYLON.Color3(1.0, 0.82, 0.58);
+  dirLight.specular = new BABYLON.Color3(0.6, 0.50, 0.38);
 
-  const sunPosition = new BABYLON.Vector3(-gridW * 0.16, 36, -gridH * 0.18);
-  dirLight.position.copyFrom(sunPosition);
-  dirLight.direction = worldCenter.subtract(sunPosition).normalize();
+  // Initialisation temporaire de dirLight — sera mis à jour chaque frame
+  const initSunPos = new BABYLON.Vector3(-gridW * 0.16, 36, -gridH * 0.18);
+  dirLight.position.copyFrom(initSunPos);
+  dirLight.direction = worldCenter.subtract(initSunPos).normalize();
 
   const glowLayer = new BABYLON.GlowLayer("exoplanetGlow", scene, {
     blurKernelSize: 48,
   });
   glowLayer.intensity = 0.45;
 
-  const sunRoot = new BABYLON.TransformNode("exoplanetSunRoot", scene);
-  sunRoot.position.copyFrom(sunPosition);
+  // =========================
+  // 3 soleils en orbite
+  // =========================
+  const ORBIT_RADIUS = Math.max(gridW, gridH) * 0.85;
 
-  const sunMat = new BABYLON.StandardMaterial("exoplanetSunMat", scene);
-  sunMat.diffuseColor = new BABYLON.Color3(1.0, 0.35, 0.75);
-  sunMat.emissiveColor = new BABYLON.Color3(1.0, 0.28, 0.85);
-  sunMat.specularColor = new BABYLON.Color3(0, 0, 0);
+  // Cluster circumpolaire — 3 soleils toujours au-dessus de l'horizon,
+  // rotation interne lente en cercle serré.
+  const T3 = (2 * Math.PI) / 3;
+  const SUN_DEFS = [
+    { clusterAngle: 0,
+      meshColor: new BABYLON.Color3(1.0, 0.28, 0.85),
+      haloColor: new BABYLON.Color3(0.38, 0.14, 0.85),
+      lightColor: new BABYLON.Color3(1.0, 0.32, 0.82),
+      maxIntensity: 3.5, contrib: 0.50, size: 14 },
+    { clusterAngle: T3,
+      meshColor: new BABYLON.Color3(0.35, 0.65, 1.0),
+      haloColor: new BABYLON.Color3(0.18, 0.38, 1.0),
+      lightColor: new BABYLON.Color3(0.45, 0.65, 1.0),
+      maxIntensity: 2.5, contrib: 0.30, size: 10 },
+    { clusterAngle: 2 * T3,
+      meshColor: new BABYLON.Color3(1.0, 0.55, 0.22),
+      haloColor: new BABYLON.Color3(0.8, 0.28, 0.06),
+      lightColor: new BABYLON.Color3(1.0, 0.58, 0.28),
+      maxIntensity: 1.8, contrib: 0.20, size: 8 },
+  ];
 
-  const sun = BABYLON.MeshBuilder.CreateSphere(
-    "exoplanetSun",
-    { diameter: 8, segments: 48 },
-    scene
-  );
-  sun.parent = sunRoot;
-  sun.material = sunMat;
+  function buildSunMesh(def, idx) {
+    const root = new BABYLON.TransformNode(`sun${idx}`, scene);
 
-  const coronaMat = new BABYLON.StandardMaterial("exoplanetCoronaMat", scene);
-  coronaMat.diffuseColor = new BABYLON.Color3(0.45, 0.8, 1.0);
-  coronaMat.emissiveColor = new BABYLON.Color3(0.25, 0.95, 1.0);
-  coronaMat.alpha = 0.72;
-  coronaMat.specularColor = new BABYLON.Color3(0, 0, 0);
+    const mat = new BABYLON.StandardMaterial(`sun${idx}Mat`, scene);
+    mat.diffuseColor = def.meshColor;
+    mat.emissiveColor = def.meshColor;
+    mat.specularColor = BABYLON.Color3.Black();
 
-  const corona = BABYLON.MeshBuilder.CreateTorus(
-    "exoplanetSunCorona",
-    { diameter: 10.8, thickness: 0.18, tessellation: 96 },
-    scene
-  );
-  corona.parent = sunRoot;
-  corona.rotation.x = Math.PI / 2.7;
-  corona.rotation.y = Math.PI / 5;
-  corona.material = coronaMat;
+    const sphere = BABYLON.MeshBuilder.CreateSphere(
+      `sun${idx}Sphere`, { diameter: def.size, segments: 32 }, scene
+    );
+    sphere.parent = root;
+    sphere.material = mat;
+    sphere.isPickable = false;
 
-  const haloMat = new BABYLON.StandardMaterial("exoplanetHaloMat", scene);
-  haloMat.diffuseColor = new BABYLON.Color3(0.85, 0.35, 1.0);
-  haloMat.emissiveColor = new BABYLON.Color3(0.38, 0.14, 0.85);
-  haloMat.alpha = 0.28;
-  haloMat.specularColor = new BABYLON.Color3(0, 0, 0);
+    const haloMat = new BABYLON.StandardMaterial(`sun${idx}HaloMat`, scene);
+    haloMat.diffuseColor = def.haloColor;
+    haloMat.emissiveColor = def.haloColor;
+    haloMat.alpha = 0.20;
+    haloMat.specularColor = BABYLON.Color3.Black();
+    const haloSphere = BABYLON.MeshBuilder.CreateSphere(
+      `sun${idx}Halo`, { diameter: def.size * 2.2, segments: 18 }, scene
+    );
+    haloSphere.parent = root;
+    haloSphere.material = haloMat;
+    haloSphere.isPickable = false;
 
-  const halo = BABYLON.MeshBuilder.CreateSphere(
-    "exoplanetSunHalo",
-    { diameter: 15, segments: 48 },
-    scene
-  );
-  halo.parent = sunRoot;
-  halo.material = haloMat;
+    const light = new BABYLON.PointLight(`sun${idx}Light`, BABYLON.Vector3.Zero(), scene);
+    light.diffuse  = def.lightColor;
+    light.specular = def.lightColor.scale(0.35);
+    light.intensity = def.maxIntensity;
+    light.range = ORBIT_RADIUS * 3.5;
 
-  const sunFillLight = new BABYLON.PointLight(
-    "exoplanetSunFill",
-    sunPosition,
-    scene
-  );
-  sunFillLight.intensity = 1.65;
-  sunFillLight.range = Math.max(gridW, gridH) * 1.45;
-  sunFillLight.diffuse = new BABYLON.Color3(1.0, 0.32, 0.82);
-  sunFillLight.specular = new BABYLON.Color3(0.45, 0.7, 1.0);
+    return { root, light, def };
+  }
+
+  const sunObjects = SUN_DEFS.map((def, i) => buildSunMesh(def, i));
 
   const shadowGenerator = new BABYLON.ShadowGenerator(1024, dirLight);
   shadowGenerator.useBlurExponentialShadowMap = true;
@@ -222,61 +201,124 @@ export function createRenderer3D(canvas, { gridW, gridH, cellSize }) {
   ground.position.z = (gridH - 1) / 2;
 
   const groundMat = new BABYLON.StandardMaterial("groundMat", scene);
-  groundMat.diffuseColor = new BABYLON.Color3(0.18, 0.15, 0.23);
-  groundMat.emissiveColor = new BABYLON.Color3(0.015, 0.012, 0.028);
-  groundMat.specularColor = new BABYLON.Color3(0.04, 0.03, 0.06);
+  // =========================
+  // Texture de sol procédurale — FBM violet + veines cyan
+  // =========================
+  function buildGroundTexture() {
+    const SIZE = 512;
+    const tex = new BABYLON.DynamicTexture(
+      "groundProcTex",
+      { width: SIZE, height: SIZE },
+      scene, true,
+      BABYLON.Texture.TRILINEAR_SAMPLINGMODE
+    );
+
+    const ctx = tex.getContext();
+    const img = ctx.createImageData(SIZE, SIZE);
+    const buf = img.data;
+
+    // Interpolation lisse (Perlin-style)
+    function smooth(t) { return t * t * (3 - 2 * t); }
+
+    // Hash entier reproductible
+    function h2(ix, iy) {
+      let v = (Math.imul(ix, 1619) ^ Math.imul(iy, 31337)) | 0;
+      v = Math.imul(v ^ (v >>> 16), 0x45d9f3b) | 0;
+      v = Math.imul(v ^ (v >>> 16), 0x45d9f3b) | 0;
+      return (v >>> 0) / 0xFFFFFFFF;
+    }
+
+    // Bruit de valeur interpolé bilinéairement
+    function vnoise(x, y) {
+      const ix = Math.floor(x), iy = Math.floor(y);
+      const fx = x - ix, fy = y - iy;
+      const ux = smooth(fx), uy = smooth(fy);
+      const a = h2(ix,     iy),     b = h2(ix + 1, iy);
+      const c = h2(ix,     iy + 1), d = h2(ix + 1, iy + 1);
+      return a + ux * (b - a) + uy * ((c - a) + ux * (a - b - c + d));
+    }
+
+    // FBM (bruit fractal, 4 octaves)
+    function fbm(x, y) {
+      return vnoise(x,          y)          * 0.500
+           + vnoise(x * 2.1,    y * 2.0)    * 0.250
+           + vnoise(x * 4.3,    y * 4.1)    * 0.125
+           + vnoise(x * 8.6,    y * 8.5)    * 0.0625;
+    }
+
+    for (let row = 0; row < SIZE; row++) {
+      for (let col = 0; col < SIZE; col++) {
+        // nx/ny couvrent toute la map en une seule fois — pas de répétition, pas de raccord
+        const nx = col / SIZE * 9.0;
+        const ny = row / SIZE * 6.0;
+
+        // 3 couches de bruit à échelles différentes
+        const n1 = fbm(nx,               ny);               // grandes taches
+        const n2 = fbm(nx * 1.8 + 3.9,   ny * 2.0 + 2.2);  // détail moyen (veines)
+        const n3 = fbm(nx * 0.4 + 7.1,   ny * 0.4 + 4.8);  // larges variations douces
+
+        // Couleur de base : combinaison des 3 couches
+        const base = n1 * 0.50 + n3 * 0.33 + n2 * 0.17;
+
+        // Veines bioluminescentes — bande plus douce (18 au lieu de 13)
+        const vein = Math.max(0, 1 - Math.abs(n2 - 0.58) * 18);
+
+        // Fissures sombres
+        const crack = Math.max(0, 1 - Math.abs(n1 - 0.28) * 20);
+
+        // Palette violette — veines moins criardes, base plus riche
+        const r = Math.max(0, Math.min(255, Math.round( 32 + base * 68  + vein * 8   - crack * 15 )));
+        const g = Math.max(0, Math.min(255, Math.round( 18 + base * 38  + vein * 40  - crack * 12 )));
+        const b = Math.max(0, Math.min(255, Math.round( 55 + base * 95  + vein * 36  - crack * 18 )));
+
+        const i = (row * SIZE + col) * 4;
+        buf[i] = r;  buf[i + 1] = g;  buf[i + 2] = b;  buf[i + 3] = 255;
+      }
+    }
+
+    ctx.putImageData(img, 0, 0);
+    tex.update(false);
+
+    // uScale/vScale = 1 → texture couvre toute la map sans répétition → aucun raccord visible
+    tex.uScale  = 1;
+    tex.vScale  = 1;
+    tex.wrapU   = BABYLON.Texture.WRAP_ADDRESSMODE;
+    tex.wrapV   = BABYLON.Texture.WRAP_ADDRESSMODE;
+
+    return tex;
+  }
+
+  const groundTex = buildGroundTexture();
+
+  groundMat.diffuseColor   = BABYLON.Color3.White();
+  groundMat.emissiveColor  = new BABYLON.Color3(0.012, 0.010, 0.022);
+  groundMat.specularColor  = new BABYLON.Color3(0.06,  0.04,  0.09);
+  groundMat.diffuseTexture = groundTex;
   ground.material = groundMat;
   ground.receiveShadows = true;
 
-  const innerGround = BABYLON.MeshBuilder.CreateGround(
-    "innerGround",
-    {
-      width: gridW - 8,
-      height: gridH - 8,
-      subdivisions: 8,
-    },
-    scene
-  );
-  innerGround.position.x = (gridW - 1) / 2;
-  innerGround.position.z = (gridH - 1) / 2;
-  innerGround.position.y = 0.015;
-
-  const innerGroundMat = new BABYLON.StandardMaterial("innerGroundMat", scene);
-  innerGroundMat.diffuseColor = new BABYLON.Color3(0.23, 0.2, 0.31);
-  innerGroundMat.emissiveColor = new BABYLON.Color3(0.018, 0.018, 0.04);
-  innerGroundMat.specularColor = new BABYLON.Color3(0.03, 0.025, 0.05);
-  innerGround.material = innerGroundMat;
-  innerGround.receiveShadows = true;
-
   // =========================
-  // Bord du monde minimal
+  // Bord du monde — plan vide infini (falaise dans le vide)
   // =========================
+  // Plan sombre très large, légèrement en dessous du sol de jeu.
+  // Combiné au fog, il donne l'effet d'une île flottant dans l'espace.
+  const voidPlane = BABYLON.MeshBuilder.CreateGround("voidPlane", {
+    width: gridW * 10, height: gridH * 10,
+  }, scene);
+  voidPlane.position.x = (gridW - 1) / 2;
+  voidPlane.position.z = (gridH - 1) / 2;
+  voidPlane.position.y = -0.4;
+  const voidMat = new BABYLON.StandardMaterial("voidMat", scene);
+  voidMat.diffuseColor  = new BABYLON.Color3(0.03, 0.02, 0.05);
+  voidMat.emissiveColor = new BABYLON.Color3(0.003, 0.002, 0.006);
+  voidMat.specularColor = BABYLON.Color3.Black();
+  voidPlane.material = voidMat;
+
   const borderHeight = 0.5;
   const borderThickness = 0.2;
 
-  function makeBorder(name, width, depth, x, z) {
-    const mesh = BABYLON.MeshBuilder.CreateBox(
-      name,
-      { width, height: borderHeight, depth },
-      scene
-    );
-    mesh.position.set(x, borderHeight / 2, z);
-
-    const mat = new BABYLON.StandardMaterial(`${name}Mat`, scene);
-    mat.diffuseColor = new BABYLON.Color3(0.34, 0.33, 0.47);
-    mat.emissiveColor = new BABYLON.Color3(0.02, 0.02, 0.05);
-    mat.specularColor = new BABYLON.Color3(0.05, 0.05, 0.08);
-    mesh.material = mat;
-    mesh.receiveShadows = true;
-    shadowGenerator.addShadowCaster(mesh);
-
-    return mesh;
-  }
-
-  makeBorder("borderTop", gridW, borderThickness, (gridW - 1) / 2, -0.5);
-  makeBorder("borderBottom", gridW, borderThickness, (gridW - 1) / 2, gridH - 0.5);
-  makeBorder("borderLeft", borderThickness, gridH, -0.5, (gridH - 1) / 2);
-  makeBorder("borderRight", borderThickness, gridH, gridW - 0.5, (gridH - 1) / 2);
+  // Les bordures sont purement logiques (worldOps.js contraint les entités par gridW/gridH).
+  // Pas de mur visible — le plan vide + le fog créent la sensation de bord naturel.
 
   // =========================
   // Matériaux entités
@@ -331,9 +373,9 @@ export function createRenderer3D(canvas, { gridW, gridH, cellSize }) {
     plantStem.specularColor = new BABYLON.Color3(0.035, 0.025, 0.02);
 
     const plantGlow = new BABYLON.StandardMaterial("decorplantGlowMat", scene);
-    plantGlow.diffuseColor = new BABYLON.Color3(0.32, 0.62, 0.42);
-    plantGlow.emissiveColor = new BABYLON.Color3(0.025, 0.09, 0.045);
-    plantGlow.specularColor = new BABYLON.Color3(0.04, 0.1, 0.055);
+    plantGlow.diffuseColor = new BABYLON.Color3(0.88, 0.58, 0.08);
+    plantGlow.emissiveColor = new BABYLON.Color3(0.14, 0.08, 0.01);
+    plantGlow.specularColor = new BABYLON.Color3(0.18, 0.10, 0.02);
 
     const spore = new BABYLON.StandardMaterial("decorSporeMat", scene);
     spore.diffuseColor = new BABYLON.Color3(0.72, 0.35, 0.9);
@@ -513,7 +555,17 @@ export function createRenderer3D(canvas, { gridW, gridH, cellSize }) {
   }
 
   function playDeathAnimation(mesh) {
-    return playActionAnimation(mesh, ["death", "die", "dead"], 900);
+    const played = playActionAnimation(mesh, ["death", "die", "dead"], DEATH_ANIMATION_MS);
+    const deathGroup = findAnimationGroup(mesh, ["death", "die", "dead"]);
+
+    if (played && deathGroup) {
+      deathGroup.speedRatio = Math.max(
+        0.25,
+        (deathGroup.to - deathGroup.from) / (60 * (DEATH_ANIMATION_MS / 1000))
+      );
+    }
+
+    return played;
   }
 
   function createCrystalCluster(name, materials) {
@@ -804,15 +856,15 @@ export function createRenderer3D(canvas, { gridW, gridH, cellSize }) {
   }
 
   function createStaticDecorations() {
-    for (let i = 0; i < STATIC_DECORATIONS.length; i++) {
-      const decoration = STATIC_DECORATIONS[i];
+    const decorations = generateDecorations(gridW, gridH);
+    for (let i = 0; i < decorations.length; i++) {
+      const decoration = decorations[i];
       const mesh = createFallbackDecorationMesh(decoration, i);
 
       mesh.position.x = decoration.x;
       mesh.position.z = decoration.y;
       mesh.rotation.y = decoration.rotation ?? 0;
-      const minVisibleScale = decoration.blocks ? 1 : 0;
-      mesh.scaling.scaleInPlace(Math.max(decoration.scale ?? 1, minVisibleScale));
+      mesh.scaling.scaleInPlace(Math.max(decoration.scale ?? 1, 0));
       mesh.metadata = {
         decorationKind: decoration.kind,
         blocks: decoration.blocks,
@@ -824,6 +876,23 @@ export function createRenderer3D(canvas, { gridW, gridH, cellSize }) {
   }
 
   createStaticDecorations();
+
+  // =========================
+  // Click-to-plant : callback déclenché quand le joueur clique sur le sol
+  // =========================
+  let groundClickCallback = null;
+
+  scene.onPointerDown = (evt, pickResult) => {
+    if (evt.button !== 0) return;
+    if (!groundClickCallback) return;
+    if (!pickResult.hit) return;
+    // On accepte les clics proches du sol (y < 1.5) pour couvrir sol + décorations basses
+    if (pickResult.pickedPoint.y > 1.5) return;
+
+    const x = Math.round(pickResult.pickedPoint.x);
+    const z = Math.round(pickResult.pickedPoint.z);
+    groundClickCallback(x, z);
+  };
 
   // =========================
   // Registres visuels
@@ -1008,7 +1077,8 @@ export function createRenderer3D(canvas, { gridW, gridH, cellSize }) {
       const dz = y - previous.y;
 
       if (Math.abs(dx) > 0.001 || Math.abs(dz) > 0.001) {
-        mesh.rotation.y = Math.atan2(dx, dz) + rotationOffset;
+        mesh.metadata ??= {};
+        mesh.metadata.targetRotationY = Math.atan2(dx, dz) + rotationOffset;
         moved = true;
       }
     }
@@ -1038,7 +1108,13 @@ export function createRenderer3D(canvas, { gridW, gridH, cellSize }) {
     if (!mesh.metadata?.deathStarted) {
       mesh.metadata ??= {};
       mesh.metadata.deathStarted = true;
-      mesh.metadata.disposeAt = performance.now() + (playDeathAnimation(mesh) ? 900 : 0);
+      const deathDuration = playDeathAnimation(mesh) ? DEATH_ANIMATION_MS : 0;
+      mesh.metadata.disposeAt = performance.now() + deathDuration + CORPSE_REMAIN_MS;
+      mesh.metadata.targetPosition = {
+        x: mesh.position.x,
+        y: Math.max(0, mesh.position.y - 0.08),
+        z: mesh.position.z,
+      };
       return;
     }
 
@@ -1053,7 +1129,6 @@ export function createRenderer3D(canvas, { gridW, gridH, cellSize }) {
   // Sync Aliens
   // =========================
   function syncAliens(world) {
-    // création / mise à jour
     for (const [id, alien] of world.aliens.entries()) {
       let mesh = alienMeshes.get(id);
 
@@ -1067,7 +1142,6 @@ export function createRenderer3D(canvas, { gridW, gridH, cellSize }) {
       placeOnGrid(mesh, alien.x, alien.y, 0);
     }
 
-    // suppression
     for (const [id, mesh] of alienMeshes.entries()) {
       if (!world.aliens.has(id)) {
         disposeEntityMesh(mesh, alienMeshes, previousAlienPositions, id);
@@ -1089,7 +1163,7 @@ export function createRenderer3D(canvas, { gridW, gridH, cellSize }) {
 
       faceMovementDirection(mesh, previousBlobPositions, id, blob.x, blob.y);
       playEntityAction(mesh, blob.lastAction, "blob");
-      placeOnGrid(mesh, blob.x, blob.y, 0);
+      placeOnGrid(mesh, blob.x, blob.y, 0.90);
     }
 
     for (const [id, mesh] of blobMeshes.entries()) {
@@ -1123,34 +1197,75 @@ export function createRenderer3D(canvas, { gridW, gridH, cellSize }) {
   }
 
   // =========================
-  // Jour / nuit minimal
+  // Cycle jour / nuit — 3 soleils orbitaux
   // =========================
-  function animateExoplanetSun() {
-    const t = performance.now() * 0.001;
-    const pulse = 1 + Math.sin(t * 1.4) * 0.035;
-    sunRoot.rotation.y = t * 0.06;
-    corona.rotation.z = t * 0.18;
-    halo.scaling.set(pulse, pulse, pulse);
-  }
+  let smoothAmbient = 0.75;
 
-  function updateLighting(view) {
-    if (view?.isNight) {
-      hemiLight.intensity = 0.26;
-      dirLight.intensity = 0.28;
-      dirLight.diffuse = new BABYLON.Color3(0.46, 0.55, 1.0);
-      sunFillLight.intensity = 0.55;
-      glowLayer.intensity = 0.32;
-      scene.clearColor = new BABYLON.Color4(0.025, 0.03, 0.06, 1);
-      scene.fogColor = new BABYLON.Color3(0.025, 0.03, 0.06);
-    } else {
-      hemiLight.intensity = 0.95;
-      dirLight.intensity = 1.45;
-      dirLight.diffuse = new BABYLON.Color3(1.0, 0.62, 0.82);
-      sunFillLight.intensity = 1.65;
-      glowLayer.intensity = 0.45;
-      scene.clearColor = new BABYLON.Color4(0.07, 0.075, 0.115, 1);
-      scene.fogColor = new BABYLON.Color3(0.07, 0.075, 0.115);
+  function updateSunsAndLighting() {
+    const dayTicks      = latestWorld?.dayTicks   ?? 100;
+    const nightTicks    = latestWorld?.nightTicks  ?? 1;
+    const cycleDuration = (dayTicks + nightTicks) * 100;
+
+    // Orbite circumpolaire — un tour complet par cycle jour/nuit
+    const baseAngle = (sunElapsedMs % cycleDuration) / cycleDuration * (2 * Math.PI);
+
+    // Plan incliné fixe : élévation de 0.55 rad garantit que clusterY > 0 à tout moment
+    const elevation = 0.55;
+    const hC = ORBIT_RADIUS * Math.sin(elevation);   // hauteur centrale fixe
+    const rH = ORBIT_RADIUS * Math.cos(elevation);   // rayon horizontal
+    const rV = rH * 0.30;                             // oscillation verticale (ellipse aplatie)
+
+    const clusterX = worldCenter.x + rH * Math.cos(baseAngle);
+    const clusterY = hC + rV * Math.sin(baseAngle);
+    const clusterZ = worldCenter.z + rH * Math.sin(baseAngle);
+
+    // Rotation interne ~42 s par tour
+    const CLUSTER_R   = 10;
+    const internalRot = sunElapsedMs * 0.00015;
+
+    // Visibilité oscillante (jour/nuit) — ne descend jamais à 0
+    const vis = Math.max(0.15, Math.min(1, (clusterY - 20) / (rH * 0.8)));
+
+    let totalContrib = 0;
+
+    for (let i = 0; i < sunObjects.length; i++) {
+      const sun = sunObjects[i];
+      const ca  = internalRot + sun.def.clusterAngle;
+      const x   = clusterX + CLUSTER_R * Math.cos(ca);
+      const y   = clusterY + CLUSTER_R * 0.45 * Math.sin(ca);
+      const z   = clusterZ + CLUSTER_R * 0.75 * Math.sin(ca);
+
+      sun.root.position.set(x, y, z);
+      sun.light.position.set(x, y, z);
+      sun.light.intensity = sun.def.maxIntensity * vis;
+      totalContrib += vis * sun.def.contrib;
+
+      if (i === 0) {
+        const dir = worldCenter.subtract(sun.root.position).normalize();
+        dirLight.direction.copyFrom(dir);
+        dirLight.position.copyFrom(sun.root.position);
+        dirLight.intensity = 1.5 * vis;
+      }
     }
+
+    const targetAmbient = Math.max(0.22, Math.min(1.1, totalContrib * 1.7));
+    smoothAmbient += (targetAmbient - smoothAmbient) * 0.028;
+    hemiLight.intensity = smoothAmbient;
+
+    const night = 1 - Math.min(1, totalContrib * 1.4);
+    scene.clearColor.set(
+      0.09 - night * 0.04,
+      0.09 - night * 0.045,
+      0.14 + night * 0.02,
+      1
+    );
+    scene.fogColor.set(
+      0.09 - night * 0.04,
+      0.09 - night * 0.045,
+      0.14 + night * 0.02
+    );
+
+    glowLayer.intensity = 0.28 + night * 0.30;
   }
 
   // =========================
@@ -1169,15 +1284,24 @@ export function createRenderer3D(canvas, { gridW, gridH, cellSize }) {
   // Rendu principal
   // =========================
   let latestViewState = null;
+  let latestWorld     = null;
+  let sunElapsedMs    = 0;   // temps de jeu écoulé (respecte pause et vitesse)
 
   function interpolateMeshPosition(mesh, deltaSeconds) {
     const target = mesh.metadata?.targetPosition;
-    if (!target) return;
-
     const t = Math.min(1, deltaSeconds * 8);
-    mesh.position.x += (target.x - mesh.position.x) * t;
-    mesh.position.y += (target.y - mesh.position.y) * t;
-    mesh.position.z += (target.z - mesh.position.z) * t;
+
+    if (target) {
+      mesh.position.x += (target.x - mesh.position.x) * t;
+      mesh.position.y += (target.y - mesh.position.y) * t;
+      mesh.position.z += (target.z - mesh.position.z) * t;
+    }
+
+    if (Number.isFinite(mesh.metadata?.targetRotationY)) {
+      let diff = mesh.metadata.targetRotationY - mesh.rotation.y;
+      diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+      mesh.rotation.y += diff * Math.min(1, deltaSeconds * 10);
+    }
   }
 
   function interpolateMovingEntities(deltaSeconds) {
@@ -1191,15 +1315,19 @@ export function createRenderer3D(canvas, { gridW, gridH, cellSize }) {
   }
 
   engine.runRenderLoop(() => {
-    const deltaSeconds = engine.getDeltaTime() / 1000;
-    interpolateMovingEntities(deltaSeconds);
-    updateLighting(latestViewState);
-    animateExoplanetSun();
+    const deltaMs = engine.getDeltaTime();
+    // Avance le temps de jeu uniquement si la simulation tourne
+    if (latestViewState && !latestViewState.paused) {
+      sunElapsedMs += deltaMs * (latestViewState.speedMultiplier ?? 1);
+    }
+    interpolateMovingEntities(deltaMs / 1000);
+    updateSunsAndLighting();
     scene.render();
   });
 
   function renderWorld(world, view) {
     latestViewState = view;
+    latestWorld     = world;
     syncPlants(world);
     syncAliens(world);
     syncBlobs(world);
@@ -1237,5 +1365,22 @@ export function createRenderer3D(canvas, { gridW, gridH, cellSize }) {
     renderWorld,
     resize,
     dispose,
+    setGroundClickCallback(fn) {
+      groundClickCallback = fn;
+    },
+    // true  → clic gauche orbite la caméra (mode par défaut)
+    // false → clic gauche libre pour le placement (caméra sur clic droit/molette)
+    setCameraControl(enabled) {
+      const pointers = camera.inputs.attached.pointers;
+      if (pointers) {
+        pointers.buttons = enabled ? [0, 1, 2] : [1, 2];
+      }
+    },
+    getAudioVolume(worldX, worldZ, maxDist = 80) {
+      const cx = camera.position.x;
+      const cz = camera.position.z;
+      const dist = Math.sqrt((worldX - cx) ** 2 + (worldZ - cz) ** 2);
+      return Math.max(0, 1 - dist / maxDist);
+    },
   };
 }
