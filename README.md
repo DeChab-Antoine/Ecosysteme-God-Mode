@@ -4,9 +4,14 @@
 
 > Vous êtes le Dieu d'une exoplanète envahie par 50 aliens. Observez, intervenez, et éliminez-les avant qu'ils atteignent 100.
 
+## Vidéo 
+
+Ouvrir https://www.youtube.com/watch?v=4utaF5djkOg
+
 ## Jouer
 
-Ouvrir `src/index.html` dans un navigateur (ou via un serveur local).
+Ouvrir `src/index.html` dans un navigateur (en local).
+ou https://dechab-antoine.github.io/Ecosysteme-God-Mode/ 
 
 ## Mécaniques
 
